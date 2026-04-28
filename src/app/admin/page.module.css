@@ -15,6 +15,70 @@
   color: var(--clr-text-muted);
 }
 
+.sectionTitle {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--clr-text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin-bottom: 20px;
+}
+
+.queueGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.queueCard {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: 16px;
+  padding: 24px;
+  text-decoration: none;
+  transition: all 0.2s var(--ease);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.queueCard:hover {
+  border-color: var(--clr-green);
+  transform: translateY(-2px);
+  background: var(--clr-surface-2);
+}
+
+.queueHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.queueTitle {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--clr-text);
+  max-width: 70%;
+}
+
+.queueCount {
+  background: var(--clr-surface-2);
+  padding: 4px 12px;
+  border-radius: 100px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--clr-text);
+}
+
+.queueAction {
+  font-size: 0.75rem;
+  color: var(--clr-green);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);

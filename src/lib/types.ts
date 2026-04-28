@@ -44,6 +44,7 @@ export interface Booking {
   paymentStatus: 'unpaid' | 'paid';
   transactionCode?: string;
   price: number;
+  location?: { lat: number; lng: number; address: string };
   createdAt: Date;
 }
 
@@ -53,6 +54,7 @@ export interface Lab {
   address: string;
   neighborhood: string;
   coordinates: { lat: number; lng: number };
+  active: boolean;
 }
 
 export const STATIC_LABS: Lab[] = [
@@ -62,6 +64,7 @@ export const STATIC_LABS: Lab[] = [
     address: '5th Floor, ACK Garden House, 1st Ngong Ave',
     neighborhood: 'Community, Nairobi',
     coordinates: { lat: -1.2988, lng: 36.8121 },
+    active: true,
   },
   {
     id: 'lab-2',
@@ -69,6 +72,7 @@ export const STATIC_LABS: Lab[] = [
     address: 'Regal Plaza, Limuru Road',
     neighborhood: 'Parklands, Nairobi',
     coordinates: { lat: -1.2612, lng: 36.8219 },
+    active: true,
   },
   {
     id: 'lab-3',
@@ -76,6 +80,7 @@ export const STATIC_LABS: Lab[] = [
     address: '5th Ngong Ave, Upper Hill',
     neighborhood: 'Upper Hill, Nairobi',
     coordinates: { lat: -1.2965, lng: 36.8085 },
+    active: true,
   },
 ];
 
@@ -85,6 +90,8 @@ export interface Result {
   bookingId: string;
   rawResults: Record<string, { value: string; unit: string; range: string; status: 'normal' | 'attention' | 'critical' }>;
   doctorNotes: string;
+  flag: 'NORMAL' | 'ATTENTION' | 'URGENT';
+  followUpAction?: string;
   status: 'pending' | 'reviewed';
   createdAt: Date;
 }

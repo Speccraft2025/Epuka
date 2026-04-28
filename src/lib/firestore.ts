@@ -11,7 +11,7 @@ import {
   serverTimestamp,
   orderBy,
 } from 'firebase/firestore';
-import { Booking, Result, UserProfile } from './types';
+import { Booking, Result, UserProfile, Lab } from './types';
 
 // Seed initial tests to Firestore (run once from admin)
 export async function seedTests() {
@@ -34,6 +34,13 @@ export async function getUserProfile(userId: string): Promise<UserProfile | null
   if (!db) return null;
   const snap = await getDoc(doc(db, 'users', userId));
   return snap.exists() ? (snap.data() as UserProfile) : null;
+}
+
+// Labs
+export async function getLabs(): Promise<Lab[]> {
+  if (!db) return [];
+  const snap = await getDocs(query(collection(db, 'labs'), where('active', '==', true)));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Lab));
 }
 
 // Bookings

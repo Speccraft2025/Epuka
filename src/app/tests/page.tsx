@@ -1,24 +1,40 @@
 'use client';
-import { useState } from 'react';
+
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { createBooking } from '@/lib/firestore';
-import { STATIC_TESTS, STATIC_LABS, Test, Lab } from '@/lib/types';
+import { createBooking, getLabs } from '@/lib/firestore';
+import { STATIC_TESTS, Test, Lab } from '@/lib/types';
 import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import styles from './page.module.css';
+
+// Client-only Map component
+const Map = dynamic(() => import('@/components/Map'), { 
+  ssr: false, 
+  loading: () => <div style={{ height: '400px', background: 'var(--clr-surface-2)', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading Map...</div> 
+});
 
 export default function TestsPage() {
   const { user, signInWithGoogle } = useAuth();
   const router = useRouter();
+  
+  const [labs, setLabs] = useState<Lab[]>([]);
   const [selected, setSelected] = useState<Test | null>(null);
   const [date, setDate] = useState('');
   const [collectionMethod, setCollectionMethod] = useState<'lab' | 'home' | null>(null);
-  const [homeAddress, setHomeAddress] = useState('');
+  const [homeLocation, setHomeLocation] = useState<{ lat: number; lng: number; address?: string } | null>(null);
   const [selectedLab, setSelectedLab] = useState<Lab | null>(null);
   const [txCode, setTxCode] = useState('');
   const [step, setStep] = useState<'browse' | 'book' | 'collection' | 'pay' | 'done'>('browse');
   const [loading, setLoading] = useState(false);
   const [bookingId, setBookingId] = useState('');
+
+  useEffect(() => {
+    if (step === 'collection') {
+      getLabs().then(setLabs);
+    }
+  }, [step]);
 
   const handleSelect = (test: Test) => {
     if (!user) {
@@ -29,15 +45,10 @@ export default function TestsPage() {
     setStep('book');
   };
 
-  const handleNextToCollection = () => {
-    if (!date) return;
-    setStep('collection');
-  };
-
   const handleBook = async () => {
     if (!user || !selected || !date || !collectionMethod) return;
     if (collectionMethod === 'lab' && !selectedLab) return;
-    if (collectionMethod === 'home' && !homeAddress) return;
+    if (collectionMethod === 'home' && !homeLocation) return;
 
     setLoading(true);
     try {
@@ -55,8 +66,14 @@ export default function TestsPage() {
       if (collectionMethod === 'lab' && selectedLab) {
         bookingData.labId = selectedLab.id;
         bookingData.labName = selectedLab.name;
-      } else if (collectionMethod === 'home') {
-        bookingData.homeAddress = homeAddress;
+        bookingData.location = { 
+          lat: selectedLab.coordinates.lat, 
+          lng: selectedLab.coordinates.lng, 
+          address: selectedLab.address 
+        };
+      } else if (collectionMethod === 'home' && homeLocation) {
+        bookingData.location = homeLocation;
+        bookingData.homeAddress = homeLocation.address;
       }
 
       const id = await createBooking(bookingData);
@@ -70,33 +87,15 @@ export default function TestsPage() {
     }
   };
 
-  const handlePay = async () => {
-    if (!txCode.trim()) return;
-    setLoading(true);
-    try {
-      const { updateBookingPayment } = await import('@/lib/firestore');
-      await updateBookingPayment(bookingId, txCode.trim());
-      setStep('done');
-    } catch (e) {
-      console.error(e);
-      alert('Failed to verify payment. Please check your transaction code.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const closeModal = () => {
     setStep('browse');
     setSelected(null);
     setDate('');
     setCollectionMethod(null);
     setSelectedLab(null);
-    setHomeAddress('');
+    setHomeLocation(null);
     setTxCode('');
   };
-
-  const minDate = new Date();
-  minDate.setDate(minDate.getDate() + 1);
 
   return (
     <>
@@ -104,33 +103,19 @@ export default function TestsPage() {
       <main className={styles.page}>
         <div className="container">
           <div className={styles.header}>
-            <div>
-              <span className={styles.tag}>Lab Tests</span>
-              <h1>Choose Your Health Panel</h1>
-              <p>Doctor-curated test bundles. Results reviewed and explained in plain language.</p>
-            </div>
+            <h1>Choose Your Health Panel</h1>
+            <p>Doctor-curated test bundles. Results reviewed and explained in plain language.</p>
           </div>
 
           <div className={styles.grid}>
             {STATIC_TESTS.map((test) => (
               <div key={test.id} className={`${styles.testCard} ${test.popular ? styles.popular : ''}`}>
-                {test.popular && <div className={styles.popularBadge}>Most Popular</div>}
                 <div className={styles.testIcon}>{test.icon}</div>
                 <h3>{test.name}</h3>
                 <p className={styles.testDesc}>{test.description}</p>
-                <div className={styles.included}>
-                  <span className={styles.includedLabel}>What&apos;s included:</span>
-                  <ul>
-                    {test.includedTests.map((t) => (
-                      <li key={t}><span className={styles.checkmark}>✓</span> {t}</li>
-                    ))}
-                  </ul>
-                </div>
                 <div className={styles.footer}>
                   <div className={styles.price}>KES {test.price.toLocaleString()}</div>
-                  <button className="btn btn-primary" onClick={() => handleSelect(test)}>
-                    Book Now
-                  </button>
+                  <button className="btn btn-primary" onClick={() => handleSelect(test)}>Book Now</button>
                 </div>
               </div>
             ))}
@@ -138,144 +123,95 @@ export default function TestsPage() {
         </div>
       </main>
 
-      {/* Booking Modal */}
       {step !== 'browse' && selected && (
         <div className="overlay" onClick={closeModal}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-
+          <div className={`${styles.modal} ${step === 'collection' ? styles.largeModal : ''}`} onClick={(e) => e.stopPropagation()}>
+            
             {step === 'book' && (
-              <>
-                <h3 style={{ marginBottom: 8 }}>Step 1: Select Date</h3>
-                <p style={{ fontSize: '0.875rem', marginBottom: 24 }}>Choose when you&apos;d like to get tested.</p>
-                <div className="form-group">
-                  <label className="form-label">Preferred Date</label>
-                  <input
-                    className="form-input"
-                    type="date"
-                    min={minDate.toISOString().split('T')[0]}
-                    value={date}
-                    onChange={(e) => setDate(e.target.value)}
-                  />
-                </div>
-                <div className={styles.modalActions} style={{ marginTop: 32 }}>
+              <div className={styles.modalContent}>
+                <h3>Step 1: Select Date</h3>
+                <input className="form-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                <div className={styles.modalActions}>
                   <button className="btn btn-ghost" onClick={closeModal}>Cancel</button>
-                  <button className="btn btn-primary" onClick={handleNextToCollection} disabled={!date}>
-                    Next: Collection Method →
-                  </button>
+                  <button className="btn btn-primary" onClick={() => setStep('collection')} disabled={!date}>Next →</button>
                 </div>
-              </>
+              </div>
             )}
 
             {step === 'collection' && (
-              <>
-                <h3 style={{ marginBottom: 8 }}>Step 2: How should we collect samples?</h3>
-                <p style={{ fontSize: '0.875rem', marginBottom: 24 }}>Visit a lab or let us come to you.</p>
-                
-                <div className={styles.choiceGrid}>
-                  <div 
-                    className={`${styles.choiceCard} ${collectionMethod === 'lab' ? styles.active : ''}`}
-                    onClick={() => setCollectionMethod('lab')}
-                  >
-                    <div className={styles.choiceIcon}>🏢</div>
-                    <h4>Lab Visit</h4>
-                    <p>Visit one of our partner labs</p>
+              <div className={styles.splitLayout}>
+                <div className={styles.sidebar}>
+                  <h3>Collection Method</h3>
+                  <div className={styles.methodToggle}>
+                    <button className={collectionMethod === 'lab' ? styles.active : ''} onClick={() => setCollectionMethod('lab')}>🏢 Lab Visit</button>
+                    <button className={collectionMethod === 'home' ? styles.active : ''} onClick={() => setCollectionMethod('home')}>🏠 Home</button>
                   </div>
-                  <div 
-                    className={`${styles.choiceCard} ${collectionMethod === 'home' ? styles.active : ''}`}
-                    onClick={() => setCollectionMethod('home')}
-                  >
-                    <div className={styles.choiceIcon}>🏠</div>
-                    <h4>Home Collection</h4>
-                    <p>We come to your location</p>
-                  </div>
-                </div>
 
-                {collectionMethod === 'lab' && (
-                  <div className={styles.labList}>
-                    <p className="form-label" style={{ marginBottom: 12 }}>Select a nearby lab</p>
-                    {STATIC_LABS.map(lab => (
-                      <div 
-                        key={lab.id} 
-                        className={`${styles.labCard} ${selectedLab?.id === lab.id ? styles.active : ''}`}
-                        onClick={() => setSelectedLab(lab)}
-                      >
-                        <div>
-                          <span className={styles.labName}>{lab.name}</span>
-                          <span className={styles.labAddress}>{lab.neighborhood}</span>
+                  {collectionMethod === 'lab' && (
+                    <div className={styles.labList}>
+                      {labs.map(lab => (
+                        <div key={lab.id} className={`${styles.labItem} ${selectedLab?.id === lab.id ? styles.active : ''}`} onClick={() => setSelectedLab(lab)}>
+                          <strong>{lab.name}</strong>
+                          <span>{lab.neighborhood}</span>
                         </div>
-                        <span className={styles.labDist}>{(Math.random() * 5 + 1).toFixed(1)}km</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                      ))}
+                    </div>
+                  )}
 
-                {collectionMethod === 'home' && (
-                  <div className="form-group">
-                    <label className="form-label">Home / Office Address</label>
-                    <textarea 
-                      className="form-input" 
-                      rows={3}
-                      placeholder="Enter your detailed location for sample collection..."
-                      value={homeAddress}
-                      onChange={(e) => setHomeAddress(e.target.value)}
-                    />
-                  </div>
-                )}
+                  {collectionMethod === 'home' && (
+                    <div className={styles.homeInstruction}>
+                      <p>Drag the pin to your exact location on the map.</p>
+                      {homeLocation && (
+                        <div className={styles.selectedAddress}>
+                          <strong>Address:</strong>
+                          <p>{homeLocation.address}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
-                <div className={styles.modalActions}>
-                  <button className="btn btn-ghost" onClick={() => setStep('book')}>Back</button>
-                  <button 
-                    className="btn btn-primary" 
-                    onClick={handleBook} 
-                    disabled={loading || (collectionMethod === 'lab' && !selectedLab) || (collectionMethod === 'home' && !homeAddress) || !collectionMethod}
-                  >
-                    {loading ? 'Processing...' : 'Confirm & Pay →'}
-                  </button>
+                  <div className={styles.modalActions} style={{ marginTop: 'auto', paddingTop: 20 }}>
+                    <button className="btn btn-ghost" onClick={() => setStep('book')}>Back</button>
+                    <button className="btn btn-primary" onClick={handleBook} disabled={loading || !collectionMethod || (collectionMethod === 'lab' && !selectedLab) || (collectionMethod === 'home' && !homeLocation)}>
+                      {loading ? '...' : 'Confirm →'}
+                    </button>
+                  </div>
                 </div>
-              </>
+
+                <div className={styles.mapContainer}>
+                  <Map 
+                    center={[-1.2921, 36.8219]} // Nairobi
+                    zoom={12}
+                    markers={collectionMethod === 'lab' ? labs.map(l => ({ id: l.id, name: l.name, position: [l.coordinates.lat, l.coordinates.lng] })) : []}
+                    onMarkerClick={(id) => setSelectedLab(labs.find(l => l.id === id) || null)}
+                    draggable={collectionMethod === 'home'}
+                    onLocationSelect={setHomeLocation}
+                    height="100%"
+                  />
+                </div>
+              </div>
             )}
 
             {step === 'pay' && (
-              <>
-                <div className={styles.payIcon}>💳</div>
+              <div className={styles.modalContent}>
                 <h3>Complete Checkout</h3>
-                <p style={{ fontSize: '0.875rem', marginBottom: 24 }}>
-                  Pay <strong style={{ color: 'var(--clr-green)' }}>KES {selected.price.toLocaleString()}</strong> to finalize your booking.
-                </p>
-                <div className={styles.mpesaInstructions}>
-                  <div className={styles.mpesaStep}><span>1</span> M-Pesa Paybill: <strong>123456</strong></div>
-                  <div className={styles.mpesaStep}><span>2</span> Account: <strong>EPUKA-{bookingId.slice(0,4)}</strong></div>
-                  <div className={styles.mpesaStep}><span>3</span> Amount: KES {selected.price.toLocaleString()}</div>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">M-Pesa Transaction Code</label>
-                  <input className="form-input" placeholder="e.g. QJH7X8ABC1"
-                    value={txCode} onChange={(e) => setTxCode(e.target.value.toUpperCase())} />
-                </div>
+                <p>Pay <strong>KES {selected.price.toLocaleString()}</strong> via M-Pesa.</p>
+                <input className="form-input" placeholder="M-Pesa Code" value={txCode} onChange={(e) => setTxCode(e.target.value.toUpperCase())} />
                 <div className={styles.modalActions}>
-                  <button className="btn btn-ghost" onClick={closeModal}>Pay Later</button>
-                  <button className="btn btn-primary" onClick={handlePay} disabled={!txCode || loading}>
-                    {loading ? 'Verifying...' : 'Finish Booking →'}
-                  </button>
+                  <button className="btn btn-primary" onClick={async () => {
+                    const { updateBookingPayment } = await import('@/lib/firestore');
+                    await updateBookingPayment(bookingId, txCode);
+                    setStep('done');
+                  }}>Finish Booking →</button>
                 </div>
-              </>
+              </div>
             )}
 
             {step === 'done' && (
-              <div className={styles.doneState}>
-                <div className={styles.doneIcon}>✅</div>
-                <h3>Booking Confirmed!</h3>
-                <p>Your {selected.name} is scheduled for {new Date(date).toLocaleDateString()}.</p>
-                <p style={{ marginTop: 8 }}>
-                  {collectionMethod === 'lab' 
-                    ? `Please visit ${selectedLab?.name} on the selected date.` 
-                    : `A professional will visit you at ${homeAddress.split(',')[0]} for sample collection.`
-                  }
-                </p>
-                <button className="btn btn-primary" style={{ marginTop: 24, width: '100%' }}
-                  onClick={() => router.push('/dashboard')}>
-                  Go to Dashboard →
-                </button>
+              <div className={styles.modalContent} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: '3rem' }}>✅</div>
+                <h3>Confirmed!</h3>
+                <button className="btn btn-primary" onClick={() => router.push('/dashboard')}>Go to Dashboard</button>
               </div>
             )}
           </div>
@@ -284,4 +220,3 @@ export default function TestsPage() {
     </>
   );
 }
-

@@ -93,6 +93,13 @@ export async function adminVerifyPayment(
 /**
  * RESULTS (MEDICAL_ADMIN + SUPER_ADMIN)
  */
+export async function adminGetAllResults() {
+  if (!db) return [];
+  const q = query(collection(db, 'results'), orderBy('createdAt', 'desc'));
+  const snap = await getDocs(q);
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Result));
+}
+
 export async function adminCreateResult(
   result: Omit<Result, 'id' | 'createdAt'>,
   adminId: string,

@@ -60,5 +60,11 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
+
+    // LABS
+    match /labs/{labId} {
+      allow read: if true;
+      allow write: if isSuperAdmin();
+    }
   }
 }

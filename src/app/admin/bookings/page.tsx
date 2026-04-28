@@ -4,13 +4,17 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { adminGetAllBookings, adminUpdateBookingStatus } from '@/lib/admin';
 import { Booking } from '@/lib/types';
+import dynamic from 'next/dynamic';
 import styles from '../page.module.css';
 
+const Map = dynamic(() => import('@/components/Map'), { ssr: false });
+
 export default function BookingsAdmin() {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
 
   useEffect(() => {
     fetchBookings();
@@ -75,9 +79,9 @@ export default function BookingsAdmin() {
                 </td>
                 <td>{b.userId.slice(0, 8)}...</td>
                 <td>
-                  <span className={styles.badge} style={{ background: 'var(--clr-surface-2)' }}>
-                    {b.collectionMethod}
-                  </span>
+                  <button className={styles.badge} style={{ background: 'var(--clr-surface-2)', border: 'none', cursor: 'pointer' }} onClick={() => setSelectedBooking(b)}>
+                    {b.collectionMethod} 📍
+                  </button>
                 </td>
                 <td>
                   <span className={`badge ${b.status === 'completed' ? 'badge-green' : b.status === 'confirmed' ? 'badge-blue' : 'badge-yellow'}`}>
@@ -86,25 +90,48 @@ export default function BookingsAdmin() {
                 </td>
                 <td>
                   {b.status === 'pending' && (
-                    <button 
-                      className="btn btn-sm btn-outline" 
-                      onClick={() => handleStatusChange(b, 'confirmed')}
-                    >
-                      Confirm
-                    </button>
+                    <button className="btn btn-sm btn-outline" onClick={() => handleStatusChange(b, 'confirmed')}>Confirm</button>
                   )}
-                  {b.status === 'confirmed' && (
-                    <span style={{ fontSize: '0.8rem', color: 'var(--clr-text-dim)' }}>Awaiting Medical</span>
-                  )}
-                  {b.status === 'completed' && (
-                    <span style={{ color: 'var(--clr-green)' }}>✓ Done</span>
-                  )}
+                  <button className="btn btn-sm btn-ghost" onClick={() => setSelectedBooking(b)}>Details</button>
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {selectedBooking && (
+        <div className="overlay" onClick={() => setSelectedBooking(null)}>
+          <div className="modal" style={{ maxWidth: 600 }} onClick={e => e.stopPropagation()}>
+            <h3>Booking Details</h3>
+            <p className={styles.mono}>{selectedBooking.id}</p>
+            
+            <div style={{ marginTop: 24, padding: 20, background: 'var(--clr-surface-2)', borderRadius: 12 }}>
+              <p><strong>Patient ID:</strong> {selectedBooking.userId}</p>
+              <p><strong>Test:</strong> {selectedBooking.testName}</p>
+              <p><strong>Method:</strong> {selectedBooking.collectionMethod.toUpperCase()}</p>
+              {selectedBooking.location && (
+                <p><strong>Address:</strong> {selectedBooking.location.address}</p>
+              )}
+            </div>
+
+            {selectedBooking.location && (
+              <div style={{ marginTop: 20, height: 250 }}>
+                <Map 
+                  center={[selectedBooking.location.lat, selectedBooking.location.lng]} 
+                  zoom={15} 
+                  markers={[{ id: '1', name: 'Collection Location', position: [selectedBooking.location.lat, selectedBooking.location.lng] }]}
+                  height="100%"
+                />
+              </div>
+            )}
+
+            <div style={{ marginTop: 32, display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={() => setSelectedBooking(null)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
