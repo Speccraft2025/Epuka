@@ -12,9 +12,15 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+// Only initialize if we have a real-looking API key (not the placeholder)
+const isConfigValid = !!firebaseConfig.apiKey && firebaseConfig.apiKey !== 'your-api-key';
 
-export const auth = getAuth(app);
-export const db = getFirestore(app);
-export const storage = getStorage(app);
+const app = isConfigValid 
+  ? (getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0])
+  : null;
+
+export const auth = app ? getAuth(app) : null;
+export const db = app ? getFirestore(app) : null;
+export const storage = app ? getStorage(app) : null;
 export const googleProvider = new GoogleAuthProvider();
+

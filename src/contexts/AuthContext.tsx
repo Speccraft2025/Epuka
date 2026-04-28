@@ -34,11 +34,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
 
   useEffect(() => {
+    if (!auth || !db) {
+      setLoading(false);
+      return;
+    }
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       if (firebaseUser) {
-        const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-        setProfileComplete(userDoc.exists() && !!userDoc.data()?.profile?.age);
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          setProfileComplete(userDoc.exists() && !!userDoc.data()?.profile?.age);
+        } catch (e) {
+          console.error('Error fetching profile:', e);
+          setProfileComplete(false);
+        }
       } else {
         setProfileComplete(false);
       }
@@ -48,8 +58,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signInWithGoogle = async () => {
+    if (!auth || !db) {
+      alert('Authentication is not configured. Please check your environment variables.');
+      return;
+    }
     try {
       const result = await signInWithPopup(auth, googleProvider);
+
       const firebaseUser = result.user;
       const userRef = doc(db, 'users', firebaseUser.uid);
       const userSnap = await getDoc(userRef);
@@ -75,9 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
-    await signOut(auth);
+    if (auth) await signOut(auth);
     router.push('/');
   };
+
 
   return (
     <AuthContext.Provider value={{ user, loading, profileComplete, signInWithGoogle, logout }}>
