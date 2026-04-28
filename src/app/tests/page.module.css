@@ -215,3 +215,108 @@
     font-size: 1.8rem;
   }
 }
+
+.choiceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.choiceCard {
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  cursor: pointer;
+  text-align: center;
+  transition: all 0.2s var(--ease);
+}
+
+.choiceCard:hover {
+  border-color: var(--clr-border-hover);
+}
+
+.choiceCard.active {
+  border-color: var(--clr-green);
+  background: rgba(52, 211, 153, 0.05);
+}
+
+.choiceIcon {
+  font-size: 1.5rem;
+  margin-bottom: 8px;
+}
+
+.choiceCard h4 {
+  font-size: 0.9rem;
+  margin-bottom: 4px;
+}
+
+.choiceCard p {
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+}
+
+.labList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin-bottom: 24px;
+  padding-right: 8px;
+}
+
+.labList::-webkit-scrollbar {
+  width: 4px;
+}
+
+.labList::-webkit-scrollbar-thumb {
+  background: var(--clr-border);
+  border-radius: 4px;
+}
+
+.labCard {
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  text-align: left;
+}
+
+.labCard:hover {
+  border-color: var(--clr-border-hover);
+}
+
+.labCard.active {
+  border-color: var(--clr-green);
+  background: rgba(52, 211, 153, 0.1);
+}
+
+.labName {
+  display: block;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: var(--clr-text);
+}
+
+.labAddress {
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+  display: block;
+}
+
+.labDist {
+  font-size: 0.75rem;
+  color: var(--clr-green);
+  font-weight: 600;
+  background: var(--clr-green-glow);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+}
+

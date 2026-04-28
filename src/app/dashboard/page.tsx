@@ -146,6 +146,9 @@ export default function DashboardPage() {
                       <span className={styles.bookingDate}>
                         {b.date ? new Date((b.date as unknown as { seconds: number }).seconds * 1000).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                       </span>
+                      <div className={styles.bookingLocation}>
+                        {b.collectionMethod === 'lab' ? `🏢 ${b.labName}` : `🏠 ${b.homeAddress?.split(',')[0]}`}
+                      </div>
                     </div>
                     <div className={styles.bookingMeta}>
                       <span className={`badge ${b.paymentStatus === 'paid' ? 'badge-green' : 'badge-yellow'}`}>

@@ -100,6 +100,14 @@
   color: var(--clr-text-muted);
 }
 
+.bookingLocation {
+  font-size: 0.75rem;
+  color: var(--clr-green);
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+
 .bookingMeta {
   display: flex;
   align-items: center;

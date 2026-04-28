@@ -33,12 +33,48 @@ export interface Booking {
   testId: string;
   testName: string;
   date: Date;
+  collectionMethod: 'lab' | 'home';
+  labId?: string;
+  labName?: string;
+  homeAddress?: string;
   status: 'pending' | 'confirmed' | 'completed';
   paymentStatus: 'unpaid' | 'paid';
   transactionCode?: string;
   price: number;
   createdAt: Date;
 }
+
+export interface Lab {
+  id: string;
+  name: string;
+  address: string;
+  neighborhood: string;
+  coordinates: { lat: number; lng: number };
+}
+
+export const STATIC_LABS: Lab[] = [
+  {
+    id: 'lab-1',
+    name: 'MediPath Diagnostic Center',
+    address: '5th Floor, ACK Garden House, 1st Ngong Ave',
+    neighborhood: 'Community, Nairobi',
+    coordinates: { lat: -1.2988, lng: 36.8121 },
+  },
+  {
+    id: 'lab-2',
+    name: 'PathCare Kenya - Main Lab',
+    address: 'Regal Plaza, Limuru Road',
+    neighborhood: 'Parklands, Nairobi',
+    coordinates: { lat: -1.2612, lng: 36.8219 },
+  },
+  {
+    id: 'lab-3',
+    name: 'Lancet Kenya - Upper Hill',
+    address: '5th Ngong Ave, Upper Hill',
+    neighborhood: 'Upper Hill, Nairobi',
+    coordinates: { lat: -1.2965, lng: 36.8085 },
+  },
+];
 
 export interface Result {
   id: string;
