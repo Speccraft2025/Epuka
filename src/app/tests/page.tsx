@@ -41,19 +41,25 @@ export default function TestsPage() {
 
     setLoading(true);
     try {
-      const id = await createBooking({
+      const bookingData: any = {
         userId: user.uid,
         testId: selected.id,
         testName: selected.name,
         date: new Date(date),
         collectionMethod,
-        labId: selectedLab?.id,
-        labName: selectedLab?.name,
-        homeAddress: collectionMethod === 'home' ? homeAddress : undefined,
         status: 'pending',
         paymentStatus: 'unpaid',
         price: selected.price,
-      });
+      };
+
+      if (collectionMethod === 'lab' && selectedLab) {
+        bookingData.labId = selectedLab.id;
+        bookingData.labName = selectedLab.name;
+      } else if (collectionMethod === 'home') {
+        bookingData.homeAddress = homeAddress;
+      }
+
+      const id = await createBooking(bookingData);
       setBookingId(id);
       setStep('pay');
     } catch (e) {
