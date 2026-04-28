@@ -111,7 +111,7 @@ export default function TestsPage() {
 
       {/* Booking Modal */}
       {step !== 'browse' && selected && (
-        <div className="overlay" onClick={step === 'browse' ? closeModal : undefined}>
+        <div className="overlay" onClick={closeModal}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
 
             {step === 'book' && (
