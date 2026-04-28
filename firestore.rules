@@ -1,28 +1,64 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow users to read and write their own profile
+    
+    // HELPER FUNCTIONS
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isSuperAdmin() {
+      return isSignedIn() && getRole() == 'SUPER_ADMIN';
+    }
+    
+    function isMedicalAdmin() {
+      return isSignedIn() && (getRole() == 'MEDICAL_ADMIN' || getRole() == 'SUPER_ADMIN');
+    }
+    
+    function isOps() {
+      return isSignedIn() && (getRole() == 'OPS' || getRole() == 'SUPER_ADMIN');
+    }
+
+    // USERS COLLECTION
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      // Users can read/write their own profile
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+      // Super Admins can manage all users
+      allow read, update: if isSuperAdmin();
     }
     
-    // Bookings
+    // BOOKINGS COLLECTION
     match /bookings/{bookingId} {
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
-      allow update: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isOps() || isMedicalAdmin());
+      // Ops and Super Admins can update status/payments
+      allow update: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid && request.resource.data.status == resource.data.status) ||
+        isOps()
+      );
     }
     
-    // Results
+    // RESULTS COLLECTION
     match /results/{resultId} {
-      allow read: if request.auth != null && (resource.data.userId == request.auth.uid || request.auth.token.admin == true);
-      allow create, update: if request.auth != null && request.auth.token.admin == true;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isMedicalAdmin());
+      // Only Medical Admins can create/edit results
+      allow create, update: if isMedicalAdmin();
     }
     
-    // Tests (Static)
+    // AUDIT LOGS
+    match /audit_logs/{logId} {
+      allow create: if isOps() || isMedicalAdmin();
+      allow read: if isSuperAdmin();
+    }
+    
+    // TESTS (Read-only for all)
     match /tests/{testId} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.token.admin == true;
+      allow write: if isSuperAdmin();
     }
   }
 }

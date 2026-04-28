@@ -11,10 +11,13 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { auth, db, googleProvider } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 
+import { UserRole } from '@/lib/types';
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
   profileComplete: boolean;
+  role: UserRole;
   signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
 }
@@ -23,6 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   profileComplete: false,
+  role: 'PATIENT',
   signInWithGoogle: async () => {},
   logout: async () => {},
 });
@@ -31,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileComplete, setProfileComplete] = useState(false);
+  const [role, setRole] = useState<UserRole>('PATIENT');
   const router = useRouter();
 
   useEffect(() => {
@@ -45,13 +50,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (firebaseUser) {
         try {
           const userDoc = await getDoc(doc(firestore, 'users', firebaseUser.uid));
-          setProfileComplete(userDoc.exists() && !!userDoc.data()?.profile?.age);
+          const userData = userDoc.data();
+          setProfileComplete(userDoc.exists() && !!userData?.profile?.age);
+          setRole(userData?.role || 'PATIENT');
         } catch (e) {
           console.error('Error fetching profile:', e);
           setProfileComplete(false);
+          setRole('PATIENT');
         }
       } else {
         setProfileComplete(false);
+        setRole('PATIENT');
       }
       setLoading(false);
     });
@@ -72,19 +81,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userSnap = await getDoc(userRef);
 
       if (!userSnap.exists()) {
-        await setDoc(userRef, {
+        const newUserProfile = {
           uid: firebaseUser.uid,
           displayName: firebaseUser.displayName,
           email: firebaseUser.email,
           photoURL: firebaseUser.photoURL,
+          role: 'PATIENT' as UserRole,
           createdAt: new Date(),
           profile: null,
-        });
-        router.push('/onboarding');
-      } else if (!userSnap.data()?.profile?.age) {
+        };
+        await setDoc(userRef, newUserProfile);
+        setRole('PATIENT');
         router.push('/onboarding');
       } else {
-        router.push('/dashboard');
+        const userData = userSnap.data();
+        setRole(userData?.role || 'PATIENT');
+        if (!userData?.profile?.age) {
+          router.push('/onboarding');
+        } else if (userData?.role && userData.role !== 'PATIENT') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
       }
     } catch (error) {
       console.error('Sign in error:', error);
@@ -98,7 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 
   return (
-    <AuthContext.Provider value={{ user, loading, profileComplete, signInWithGoogle, logout }}>
+    <AuthContext.Provider value={{ user, loading, profileComplete, role, signInWithGoogle, logout }}>
       {children}
     </AuthContext.Provider>
   );

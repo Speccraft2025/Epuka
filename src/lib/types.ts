@@ -1,8 +1,11 @@
+export type UserRole = 'SUPER_ADMIN' | 'MEDICAL_ADMIN' | 'OPS' | 'PATIENT';
+
 export interface UserProfile {
   uid: string;
   displayName: string;
   email: string;
   photoURL?: string;
+  role: UserRole;
   createdAt: Date;
   profile: {
     age: number;
@@ -84,6 +87,18 @@ export interface Result {
   doctorNotes: string;
   status: 'pending' | 'reviewed';
   createdAt: Date;
+}
+
+export interface AuditLog {
+  id: string;
+  userId: string;
+  userEmail: string;
+  action: string;
+  entityId: string;
+  entityType: 'booking' | 'result' | 'user' | 'payment';
+  previousValue?: any;
+  newValue?: any;
+  timestamp: Date;
 }
 
 export const STATIC_TESTS: Test[] = [
