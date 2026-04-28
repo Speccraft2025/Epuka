@@ -2,7 +2,7 @@
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { createBooking } from '@/lib/firestore';
-import { STATIC_TESTS, Test } from '@/lib/types';
+import { STATIC_TESTS, STATIC_LABS, Test, Lab } from '@/lib/types';
 import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
