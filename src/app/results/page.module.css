@@ -1,0 +1,130 @@
+.page {
+  padding-top: 100px;
+  padding-bottom: 80px;
+  min-height: 100vh;
+}
+
+.header {
+  margin-bottom: 48px;
+}
+
+.resultsGrid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 32px;
+}
+
+.resultCard {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-xl);
+  padding: 40px;
+}
+
+.resultHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 32px;
+}
+
+.date {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--clr-text-muted);
+}
+
+.reportContent {
+  background: var(--clr-surface-2);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.indicatorRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--clr-border);
+}
+
+.indicatorRow:last-child {
+  border-bottom: none;
+}
+
+.indicatorMain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.indicatorName {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--clr-text);
+}
+
+.indicatorRange {
+  font-size: 0.75rem;
+  color: var(--clr-text-muted);
+}
+
+.indicatorValue {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.val {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--clr-text);
+}
+
+.doctorInterpretation {
+  background: var(--clr-green-glow);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  border-radius: var(--radius-lg);
+  padding: 24px;
+  margin-bottom: 32px;
+}
+
+.doctorInterpretation h4 {
+  color: var(--clr-green);
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+}
+
+.doctorInterpretation p {
+  font-size: 1rem;
+  color: var(--clr-text);
+  line-height: 1.7;
+}
+
+.footer {
+  display: flex;
+  gap: 12px;
+  border-top: 1px solid var(--clr-border);
+  padding-top: 32px;
+}
+
+.empty {
+  text-align: center;
+  padding: 80px 0;
+}
+
+.emptyIcon {
+  font-size: 4rem;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 640px) {
+  .indicatorRow {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

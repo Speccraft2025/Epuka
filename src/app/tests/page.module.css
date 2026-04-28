@@ -1,0 +1,217 @@
+.page {
+  padding-top: 100px;
+  padding-bottom: 80px;
+  min-height: 100vh;
+}
+
+.header {
+  margin-bottom: 48px;
+}
+
+.tag {
+  display: inline-block;
+  background: var(--clr-green-glow);
+  color: var(--clr-green);
+  border: 1px solid rgba(52, 211, 153, 0.2);
+  border-radius: var(--radius-full);
+  padding: 4px 12px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 12px;
+}
+
+.header h1 {
+  font-size: 2.2rem;
+  margin-bottom: 8px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+}
+
+.testCard {
+  background: var(--clr-surface);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-xl);
+  padding: 32px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.3s var(--ease);
+}
+
+.testCard:hover {
+  border-color: var(--clr-border-hover);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-green);
+}
+
+.popular {
+  border-color: var(--clr-green);
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.05) 0%, var(--clr-surface) 100%);
+}
+
+.popularBadge {
+  position: absolute;
+  top: -12px;
+  right: 24px;
+  background: var(--clr-green);
+  color: #0a0e0d;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+
+.testIcon {
+  font-size: 2rem;
+  margin-bottom: 16px;
+}
+
+.testCard h3 {
+  font-size: 1.25rem;
+  margin-bottom: 12px;
+}
+
+.testDesc {
+  font-size: 0.875rem;
+  color: var(--clr-text-dim);
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.included {
+  flex: 1;
+  margin-bottom: 32px;
+}
+
+.includedLabel {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--clr-text-muted);
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.included ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.included li {
+  font-size: 0.85rem;
+  color: var(--clr-text-dim);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkmark {
+  color: var(--clr-green);
+  font-weight: bold;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 24px;
+  border-top: 1px solid var(--clr-border);
+}
+
+.price {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--clr-text);
+}
+
+/* Modal styling within page module */
+.modalPrice {
+  background: var(--clr-surface-2);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  text-align: center;
+  margin-bottom: 24px;
+  font-size: 1rem;
+}
+
+.modalActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+/* M-Pesa Flow */
+.payIcon {
+  font-size: 3rem;
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.mpesaInstructions {
+  background: rgba(52, 211, 153, 0.05);
+  border: 1px solid rgba(52, 211, 153, 0.1);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mpesaStep {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: var(--clr-text-dim);
+}
+
+.mpesaStep span {
+  width: 20px;
+  height: 20px;
+  background: var(--clr-green);
+  color: #0a0e0d;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* Done State */
+.doneState {
+  text-align: center;
+  padding: 24px 0;
+}
+
+.doneIcon {
+  font-size: 3.5rem;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 1024px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .header h1 {
+    font-size: 1.8rem;
+  }
+}
