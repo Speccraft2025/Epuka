@@ -7,6 +7,25 @@ import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 
+const HELP_TEXT: Record<string, string> = {
+  'Blood Sugar (Glucose)': 'Measures the amount of sugar in your blood. Primary indicator for diabetes and metabolic health.',
+  'Total Cholesterol': 'Total amount of cholesterol in your blood. High levels can increase heart disease risk.',
+  'LDL (Bad Cholesterol)': 'Can build up in artery walls. Lower is generally better for heart health.',
+  'HDL (Good Cholesterol)': 'The "good" cholesterol that helps remove other fats from your bloodstream.',
+  'Triglycerides': 'A type of fat used for energy. High levels often correlate with metabolic issues.',
+  'Kidney Function (Creatinine)': 'A waste product filtered by kidneys. High levels may indicate reduced kidney function.',
+  'Liver Function (ALT/AST)': 'Enzymes that indicate liver health. Elevation can suggest liver stress.',
+  'Thyroid (TSH)': 'Thyroid Stimulating Hormone. Regulates your metabolism and energy levels.',
+};
+
+const CATEGORIES: Record<string, string[]> = {
+  'Metabolic & Diabetes': ['Blood Sugar (Glucose)', 'HbA1c (Diabetes Risk)'],
+  'Heart & Lipids': ['Total Cholesterol', 'LDL (Bad Cholesterol)', 'HDL (Good Cholesterol)', 'Triglycerides'],
+  'Organ Function': ['Kidney Function (Creatinine)', 'Liver Function (ALT/AST)', 'Thyroid (TSH)', 'Urine Analysis'],
+  'Vitamins & Minerals': ['Vitamin D & B12'],
+  'Blood Composition': ['Complete Blood Count (CBC)'],
+};
+
 export default function ResultsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -30,69 +49,137 @@ export default function ResultsPage() {
     return <div className="loading-screen"><div className="spinner" /></div>;
   }
 
+  const latest = results[0];
+
+  function getMarkerPosition(value: string, range: string) {
+    const numVal = parseFloat(value);
+    const matches = range.match(/(\d+\.?\d*)\s*-\s*(\d+\.?\d*)/);
+    if (!matches) return 50;
+    const min = parseFloat(matches[1]);
+    const max = parseFloat(matches[2]);
+    const spread = max - min;
+    const padding = spread * 0.4;
+    const totalMin = min - padding;
+    const totalMax = max + padding;
+    const pos = ((numVal - totalMin) / (totalMax - totalMin)) * 100;
+    return Math.min(Math.max(pos, 5), 95);
+  }
+
   return (
     <>
       <Navbar />
       <main className={styles.page}>
         <div className="container">
           <div className={styles.header}>
-            <h1>My Lab Results</h1>
-            <p>Access your medical reports and simplified doctor interpretations.</p>
+            <div>
+              <h1>Health Insights</h1>
+              <p>Detailed analysis of your latest laboratory markers.</p>
+            </div>
+            {latest && (
+              <span className={styles.date}>Report Date: {new Date((latest.createdAt as any).seconds * 1000).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            )}
           </div>
 
-          {results.length === 0 ? (
+          {!latest ? (
             <div className={styles.empty}>
               <div className={styles.emptyIcon}>📋</div>
-              <h3>No results yet</h3>
-              <p>Your results will appear here as soon as they are reviewed by our doctors.</p>
-              <a href="/tests" className="btn btn-primary" style={{ marginTop: 20 }}>Book a Test</a>
+              <h3>No reports found</h3>
+              <p>Once your samples are processed, your digital health panel will appear here.</p>
+              <button onClick={() => router.push('/tests')} className="btn btn-primary" style={{ marginTop: 24 }}>Book a Test</button>
             </div>
           ) : (
             <div className={styles.resultsGrid}>
-              {results.map((r) => (
-                <div key={r.id} className={styles.resultCard}>
-                  <div className={styles.resultHeader}>
-                    <div className={styles.resultInfo}>
-                      <span className={styles.date}>
-                        {new Date((r.createdAt as any).seconds * 1000).toLocaleDateString()}
-                      </span>
-                      <h3>Health Panel Report</h3>
-                    </div>
-                    <span className={`badge ${r.status === 'reviewed' ? 'badge-green' : 'badge-yellow'}`}>
-                      {r.status === 'reviewed' ? 'Reviewed' : 'Processing'}
-                    </span>
+              
+              {/* Summary Section */}
+              <div className={styles.reportSummary}>
+                <div className={styles.summaryCard}>
+                  <span className={styles.summaryLabel}>Total Markers</span>
+                  <div className={styles.summaryValue}>{latest.rawResults ? Object.keys(latest.rawResults).length : 0}</div>
+                  <span className={styles.summarySub}>Analyzed by Lab</span>
+                </div>
+                <div className={styles.summaryCard}>
+                  <span className={styles.summaryLabel}>Attention Needed</span>
+                  <div className={styles.summaryValue} style={{ color: 'var(--clr-warning)' }}>
+                    {latest.rawResults ? Object.values(latest.rawResults).filter(v => v.status !== 'normal').length : 0}
                   </div>
+                  <span className={styles.summarySub}>Markers outside ideal range</span>
+                </div>
+                <div className={styles.summaryCard}>
+                  <span className={styles.summaryLabel}>Report Status</span>
+                  <div className={styles.summaryValue} style={{ color: 'var(--clr-green)', fontSize: '1.5rem' }}>DOCTOR REVIEWED</div>
+                  <span className={styles.summarySub}>Final interpretation complete</span>
+                </div>
+              </div>
 
-                  <div className={styles.reportContent}>
-                    {r.rawResults && Object.entries(r.rawResults).map(([key, val]: [string, any]) => (
-                      <div key={key} className={styles.indicatorRow}>
-                        <div className={styles.indicatorMain}>
-                          <span className={styles.indicatorName}>{key}</span>
-                          <span className={styles.indicatorRange}>Ref: {val.range}</span>
-                        </div>
-                        <div className={styles.indicatorValue}>
-                          <span className={styles.val}>{val.value} {val.unit}</span>
-                          <span className={`badge ${val.status === 'normal' ? 'badge-green' : val.status === 'attention' ? 'badge-yellow' : 'badge-red'}`}>
-                            {val.status}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {/* Categorized Markers */}
+              {Object.entries(CATEGORIES).map(([catName, markers]) => {
+                const catResults = Object.entries(latest.rawResults || {}).filter(([key]) => markers.includes(key));
+                if (catResults.length === 0) return null;
 
-                  {r.doctorNotes && (
-                    <div className={styles.doctorInterpretation}>
-                      <h4>🩺 Doctor&apos;s Interpretation</h4>
-                      <p>{r.doctorNotes}</p>
+                return (
+                  <div key={catName} className={styles.categorySection}>
+                    <h2 className={styles.categoryTitle}>{catName}</h2>
+                    <div className={styles.metricGrid}>
+                      {catResults.map(([name, val]) => (
+                        <div key={name} className={styles.metricCard}>
+                          <div className={styles.metricHeader}>
+                            <div className={styles.metricInfo}>
+                              <span className={styles.metricName}>
+                                {name}
+                                <span className={styles.helpIcon}>ⓘ</span>
+                                <div className={styles.tooltip}>{HELP_TEXT[name] || 'Clinical marker for health monitoring.'}</div>
+                              </span>
+                              <div className={styles.metricValue}>
+                                <span className={styles.valLarge}>{val.value}</span>
+                                <span className={styles.unit}>{val.unit}</span>
+                              </div>
+                            </div>
+                            <span className={`badge ${val.status === 'normal' ? 'badge-green' : val.status === 'attention' ? 'badge-yellow' : 'badge-red'}`}>
+                              {val.status.toUpperCase()}
+                            </span>
+                          </div>
+
+                          <div className={styles.rangeContainer}>
+                            <div className={styles.rangeBar}>
+                              <div className={styles.idealZone} style={{ left: '25%', width: '50%' }} />
+                              <div 
+                                className={`${styles.marker} ${styles[val.status]}`} 
+                                style={{ left: `${getMarkerPosition(val.value, val.range)}%` }} 
+                              />
+                            </div>
+                            <div className={styles.rangeLabels}>
+                              <span>{val.range.split('-')[0]} Low</span>
+                              <span>Reference Range: {val.range}</span>
+                              <span>{val.range.split('-')[1]} High</span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
+                  </div>
+                );
+              })}
 
-                  <div className={styles.footer}>
-                    <button className="btn btn-outline btn-sm">Download PDF</button>
-                    <button className="btn btn-ghost btn-sm">Share with Doctor</button>
+              {/* Doctor's Interpretation */}
+              {latest.doctorNotes && (
+                <div className={styles.doctorSection}>
+                  <div className={styles.doctorHeader}>
+                    <div className={styles.doctorAvatar}>👨‍⚕️</div>
+                    <div>
+                      <div className={styles.doctorLabel}>Clinical Interpretation</div>
+                      <div className={styles.doctorName}>Dr. Reviewing Officer</div>
+                    </div>
+                  </div>
+                  <div className={styles.doctorContent}>
+                    <p>{latest.doctorNotes}</p>
                   </div>
                 </div>
-              ))}
+              )}
+
+              <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 24 }}>
+                <button className="btn btn-primary">Download Official PDF</button>
+                <button className="btn btn-outline" onClick={() => window.print()}>Print Report</button>
+              </div>
             </div>
           )}
         </div>
