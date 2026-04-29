@@ -13,7 +13,7 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Booking, Result, UserProfile, UserRole, AuditLog, BookingStatus } from './types';
+import { Booking, Result, UserProfile, UserRole, AuditLog, BookingStatus, Lab } from './types';
 
 export const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
   'BOOKED': ['PAYMENT_PENDING', 'CLOSED'],

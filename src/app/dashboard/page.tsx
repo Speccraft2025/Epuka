@@ -16,9 +16,15 @@ function getBmiCategory(bmi: number) {
 }
 
 const STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
-  pending:   { label: 'Pending',   badge: 'badge-yellow' },
-  confirmed: { label: 'Confirmed', badge: 'badge-blue' },
-  completed: { label: 'Completed', badge: 'badge-green' },
+  BOOKED:            { label: 'Booked',           badge: 'badge-yellow' },
+  PAYMENT_PENDING:   { label: 'Payment Pending',  badge: 'badge-yellow' },
+  PAYMENT_CONFIRMED: { label: 'Payment Confirmed',badge: 'badge-blue'   },
+  ASSIGNED_TO_LAB:   { label: 'Lab Assigned',     badge: 'badge-blue'   },
+  SAMPLE_COLLECTED:  { label: 'Sample Collected', badge: 'badge-blue'   },
+  IN_ANALYSIS:       { label: 'In Analysis',      badge: 'badge-blue'   },
+  VERIFIED:          { label: 'Verified',          badge: 'badge-green'  },
+  DELIVERED:         { label: 'Results Ready',    badge: 'badge-green'  },
+  CLOSED:            { label: 'Completed',        badge: 'badge-green'  },
 };
 
 export default function DashboardPage() {
@@ -100,7 +106,7 @@ export default function DashboardPage() {
             <div className="stat-card">
               <div className="stat-label">Total Tests Booked</div>
               <div className="stat-value">{bookings.length}</div>
-              <div className="stat-sub">{bookings.filter(b => b.status === 'completed').length} completed</div>
+              <div className="stat-sub">{bookings.filter(b => b.status === 'CLOSED').length} completed</div>
             </div>
 
             <div className="stat-card">

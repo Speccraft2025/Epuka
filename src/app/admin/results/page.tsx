@@ -29,7 +29,7 @@ export default function MedicalResultsAdmin() {
   const fetchBookings = async () => {
     setLoading(true);
     const data = await adminGetAllBookings();
-    setBookings(data.filter(b => b.status === 'confirmed'));
+    setBookings(data.filter(b => ['SAMPLE_COLLECTED', 'IN_ANALYSIS', 'PAYMENT_CONFIRMED', 'ASSIGNED_TO_LAB'].includes(b.status)));
     setLoading(false);
   };
 
@@ -74,7 +74,8 @@ export default function MedicalResultsAdmin() {
         doctorNotes: form.doctorNotes,
         flag: form.flag,
         followUpAction: form.followUpAction,
-        status: 'reviewed'
+        status: 'reviewed',
+        medicalApprovalStatus: form.flag === 'URGENT' ? 'PENDING' : 'APPROVED',
       }, user.uid, user.email || '');
 
       await adminTransitionBookingState(
