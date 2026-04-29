@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { adminGetAllBookings, adminGetLabs } from '@/lib/admin';
 import { Booking, Lab } from '@/lib/types';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import Navbar from '@/components/Navbar';
 import styles from '../page.module.css';
