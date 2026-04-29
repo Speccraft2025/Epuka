@@ -13,7 +13,19 @@ import {
   serverTimestamp
 } from 'firebase/firestore';
 import { db } from './firebase';
-import { Booking, Result, UserProfile, UserRole, AuditLog } from './types';
+import { Booking, Result, UserProfile, UserRole, AuditLog, BookingStatus } from './types';
+
+export const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
+  'BOOKED': ['PAYMENT_PENDING', 'CLOSED'],
+  'PAYMENT_PENDING': ['PAYMENT_CONFIRMED', 'CLOSED'],
+  'PAYMENT_CONFIRMED': ['ASSIGNED_TO_LAB'],
+  'ASSIGNED_TO_LAB': ['SAMPLE_COLLECTED'],
+  'SAMPLE_COLLECTED': ['IN_ANALYSIS'],
+  'IN_ANALYSIS': ['VERIFIED'],
+  'VERIFIED': ['DELIVERED'],
+  'DELIVERED': ['CLOSED'],
+  'CLOSED': []
+};
 
 /**
  * AUDIT LOGGING
@@ -40,25 +52,30 @@ export async function adminGetAllBookings() {
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as Booking));
 }
 
-export async function adminUpdateBookingStatus(
+export async function adminTransitionBookingState(
   bookingId: string, 
-  status: Booking['status'], 
-  adminId: string, 
-  adminEmail: string,
-  prevStatus: string
+  newState: BookingStatus, 
+  admin: { uid: string; email: string; role: UserRole },
+  currentStatus: BookingStatus
 ) {
   if (!db) return;
+
+  // Validation
+  if (admin.role !== 'SUPER_ADMIN' && !ALLOWED_TRANSITIONS[currentStatus]?.includes(newState)) {
+    throw new Error(`Invalid state transition: ${currentStatus} -> ${newState}`);
+  }
+
   const ref = doc(db, 'bookings', bookingId);
-  await updateDoc(ref, { status });
+  await updateDoc(ref, { status: newState });
   
   await createAuditLog({
-    userId: adminId,
-    userEmail: adminEmail,
-    action: 'UPDATED_BOOKING_STATUS',
+    userId: admin.uid,
+    userEmail: admin.email,
+    action: 'TRANSITION_BOOKING_STATE',
     entityId: bookingId,
     entityType: 'booking',
-    previousValue: prevStatus,
-    newValue: status
+    previousValue: currentStatus,
+    newValue: newState
   });
 }
 
@@ -69,24 +86,26 @@ export async function adminVerifyPayment(
   bookingId: string, 
   transactionCode: string, 
   status: 'paid' | 'unpaid',
-  adminId: string,
-  adminEmail: string
+  admin: { uid: string; email: string; role: UserRole },
+  currentBookingStatus: BookingStatus
 ) {
   if (!db) return;
   const ref = doc(db, 'bookings', bookingId);
+  const nextStatus: BookingStatus = status === 'paid' ? 'PAYMENT_CONFIRMED' : 'PAYMENT_PENDING';
+
   await updateDoc(ref, { 
     paymentStatus: status,
     transactionCode: transactionCode,
-    status: status === 'paid' ? 'confirmed' : 'pending'
+    status: nextStatus
   });
 
   await createAuditLog({
-    userId: adminId,
-    userEmail: adminEmail,
+    userId: admin.uid,
+    userEmail: admin.email,
     action: 'VERIFIED_PAYMENT',
     entityId: bookingId,
     entityType: 'payment',
-    newValue: { status, transactionCode }
+    newValue: { status, transactionCode, nextStatus }
   });
 }
 
@@ -163,4 +182,13 @@ export async function adminGetAuditLogs() {
   const q = query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(50));
   const snap = await getDocs(q);
   return snap.docs.map(d => ({ id: d.id, ...d.data() } as AuditLog));
+}
+
+/**
+ * LABS
+ */
+export async function adminGetLabs() {
+  if (!db) return [];
+  const snap = await getDocs(collection(db, 'labs'));
+  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Lab));
 }

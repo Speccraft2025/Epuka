@@ -14,37 +14,13 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     (async () => {
-      const [bookings, results] = await Promise.all([
-        adminGetAllBookings(),
-        adminGetAllResults()
-      ]);
+      const [bookings, results] = await Promise.all([adminGetAllBookings(), adminGetAllResults()]);
       setData({ bookings, results });
       setLoading(false);
     })();
   }, []);
 
   if (loading) return <div className="loading-screen"><div className="spinner" /></div>;
-
-  const isToday = (date: any) => {
-    if (!date) return false;
-    const d = new Date((date as any).seconds * 1000);
-    const today = new Date();
-    return d.toDateString() === today.toDateString();
-  };
-
-  // Queues
-  const opsQueues = {
-    pendingPayments: data.bookings.filter(b => b.paymentStatus === 'unpaid'),
-    scheduledToday: data.bookings.filter(b => isToday(b.date)),
-    readyForLab: data.bookings.filter(b => b.paymentStatus === 'paid' && b.status === 'confirmed'),
-    completed: data.bookings.filter(b => b.status === 'completed'),
-  };
-
-  const medicalQueues = {
-    awaitingReview: data.results.filter(r => r.status === 'pending'),
-    urgentCases: data.results.filter(r => r.flag === 'URGENT' && r.status === 'pending'),
-    approvedToday: data.results.filter(r => r.status === 'reviewed' && isToday(r.createdAt)),
-  };
 
   const renderQueueItem = (title: string, count: number, path: string, color?: string) => (
     <Link href={path} className={styles.queueCard}>
@@ -59,29 +35,29 @@ export default function AdminDashboard() {
   return (
     <div className={styles.container}>
       <header className={styles.header}>
-        <h1>Today&apos;s Operations</h1>
-        <p>Prioritized work queues based on your role.</p>
+        <h1>Operations Dashboard</h1>
+        <p>Prioritized work queues by role.</p>
       </header>
 
       {(role === 'SUPER_ADMIN' || role === 'OPS') && (
         <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>Logistics & Payments (OPS)</h2>
+          <h2 className={styles.sectionTitle}>Logistics Queue (OPS)</h2>
           <div className={styles.queueGrid}>
-            {renderQueueItem("Pending Payments", opsQueues.pendingPayments.length, "/admin/payments", opsQueues.pendingPayments.length > 0 ? "var(--clr-warning)" : undefined)}
-            {renderQueueItem("Scheduled Today", opsQueues.scheduledToday.length, "/admin/bookings")}
-            {renderQueueItem("Ready for Lab", opsQueues.readyForLab.length, "/admin/bookings", "var(--clr-blue)")}
-            {renderQueueItem("Completed", opsQueues.completed.length, "/admin/bookings")}
+            {renderQueueItem("New Bookings", data.bookings.filter(b => b.status === 'BOOKED').length, "/admin/bookings", "var(--clr-blue)")}
+            {renderQueueItem("Pending Payment", data.bookings.filter(b => b.status === 'PAYMENT_PENDING').length, "/admin/bookings", "var(--clr-warning)")}
+            {renderQueueItem("Ready for Collection", data.bookings.filter(b => b.status === 'PAYMENT_CONFIRMED').length, "/admin/bookings", "var(--clr-green)")}
+            {renderQueueItem("Active Logistics", data.bookings.filter(b => ['ASSIGNED_TO_LAB', 'SAMPLE_COLLECTED'].includes(b.status)).length, "/admin/logistics")}
           </div>
         </section>
       )}
 
       {(role === 'SUPER_ADMIN' || role === 'MEDICAL_ADMIN') && (
         <section className={styles.section} style={{ marginTop: 48 }}>
-          <h2 className={styles.sectionTitle}>Medical Review (Clinical)</h2>
+          <h2 className={styles.sectionTitle}>Clinical Queue (Medical)</h2>
           <div className={styles.queueGrid}>
-            {renderQueueItem("Urgent Cases", medicalQueues.urgentCases.length, "/admin/results", medicalQueues.urgentCases.length > 0 ? "var(--clr-red)" : undefined)}
-            {renderQueueItem("Awaiting Review", medicalQueues.awaitingReview.length, "/admin/results", medicalQueues.awaitingReview.length > 0 ? "var(--clr-blue)" : undefined)}
-            {renderQueueItem("Approved Today", medicalQueues.approvedToday.length, "/admin/results")}
+            {renderQueueItem("Urgent Analysis", data.results.filter(r => r.flag === 'URGENT' && r.medicalApprovalStatus === 'PENDING').length, "/admin/results", "var(--clr-red)")}
+            {renderQueueItem("Pending Approval", data.results.filter(r => r.medicalApprovalStatus === 'PENDING').length, "/admin/results", "var(--clr-blue)")}
+            {renderQueueItem("Verified Today", data.results.filter(r => r.medicalApprovalStatus === 'APPROVED').length, "/admin/results")}
           </div>
         </section>
       )}

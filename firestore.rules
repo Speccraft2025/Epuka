@@ -25,44 +25,49 @@ service cloud.firestore {
 
     // USERS COLLECTION
     match /users/{userId} {
-      // Users can read/write their own profile
-      allow read, write: if isSignedIn() && request.auth.uid == userId;
-      // Super Admins can manage all users
-      allow read, update: if isSuperAdmin();
+      allow read: if isSignedIn() && (request.auth.uid == userId || isSuperAdmin() || isOps() || isMedicalAdmin());
+      allow write: if isSignedIn() && request.auth.uid == userId;
+      allow update: if isSuperAdmin();
     }
     
     // BOOKINGS COLLECTION
     match /bookings/{bookingId} {
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isOps() || isMedicalAdmin());
-      // Ops and Super Admins can update status/payments
+      
+      // Strict state updates
       allow update: if isSignedIn() && (
-        (resource.data.userId == request.auth.uid && request.resource.data.status == resource.data.status) ||
-        isOps()
+        isSuperAdmin() || 
+        (isOps() && resource.data.status != 'CLOSED') ||
+        (isMedicalAdmin() && resource.data.status != 'CLOSED')
       );
     }
     
     // RESULTS COLLECTION
     match /results/{resultId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isMedicalAdmin());
+      // Patients can only see APPROVED results
+      allow read: if isSignedIn() && (
+        (resource.data.userId == request.auth.uid && resource.data.medicalApprovalStatus == 'APPROVED') || 
+        isMedicalAdmin()
+      );
+      
       // Only Medical Admins can create/edit results
       allow create, update: if isMedicalAdmin();
     }
     
-    // AUDIT LOGS
+    // AUDIT LOGS (Append-only)
     match /audit_logs/{logId} {
-      allow create: if isOps() || isMedicalAdmin();
+      allow create: if isSignedIn();
       allow read: if isSuperAdmin();
+      allow update, delete: if false;
     }
     
-    // TESTS (Read-only for all)
-    match /tests/{testId} {
+    // LABS & TESTS
+    match /labs/{labId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }
-
-    // LABS
-    match /labs/{labId} {
+    match /tests/{testId} {
       allow read: if true;
       allow write: if isSuperAdmin();
     }

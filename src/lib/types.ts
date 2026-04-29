@@ -30,6 +30,17 @@ export interface Test {
   popular?: boolean;
 }
 
+export type BookingStatus = 
+  | 'BOOKED' 
+  | 'PAYMENT_PENDING' 
+  | 'PAYMENT_CONFIRMED' 
+  | 'ASSIGNED_TO_LAB' 
+  | 'SAMPLE_COLLECTED' 
+  | 'IN_ANALYSIS' 
+  | 'VERIFIED' 
+  | 'DELIVERED' 
+  | 'CLOSED';
+
 export interface Booking {
   id: string;
   userId: string;
@@ -40,7 +51,7 @@ export interface Booking {
   labId?: string;
   labName?: string;
   homeAddress?: string;
-  status: 'pending' | 'confirmed' | 'completed';
+  status: BookingStatus;
   paymentStatus: 'unpaid' | 'paid';
   transactionCode?: string;
   price: number;
@@ -93,6 +104,7 @@ export interface Result {
   flag: 'NORMAL' | 'ATTENTION' | 'URGENT';
   followUpAction?: string;
   status: 'pending' | 'reviewed';
+  medicalApprovalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
   createdAt: Date;
 }
 
