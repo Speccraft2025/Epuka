@@ -7,7 +7,7 @@ import { Booking } from '@/lib/types';
 import styles from '../page.module.css';
 
 export default function PaymentsAdmin() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [verifyingId, setVerifyingId] = useState<string | null>(null);
@@ -25,9 +25,15 @@ export default function PaymentsAdmin() {
     setLoading(false);
   };
 
-  const handleVerify = async (bookingId: string) => {
+  const handleVerify = async (booking: Booking) => {
     if (!user || !txCode) return;
-    await adminVerifyPayment(bookingId, txCode, 'paid', user.uid, user.email || '');
+    await adminVerifyPayment(
+      booking.id, 
+      txCode, 
+      'paid', 
+      { uid: user.uid, email: user.email || '', role: role as any }, 
+      booking.status
+    );
     setVerifyingId(null);
     setTxCode('');
     fetchBookings();
@@ -79,7 +85,7 @@ export default function PaymentsAdmin() {
                           value={txCode}
                           onChange={e => setTxCode(e.target.value)}
                         />
-                        <button className="btn btn-sm btn-primary" onClick={() => handleVerify(b.id)}>Approve</button>
+                        <button className="btn btn-sm btn-primary" onClick={() => handleVerify(b)}>Approve</button>
                         <button className="btn btn-sm btn-ghost" onClick={() => setVerifyingId(null)}>×</button>
                       </div>
                     ) : (
