@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { adminGetAllBookings, adminUpdateBookingStatus } from '@/lib/admin';
+import { adminGetAllBookings, adminTransitionBookingState } from '@/lib/admin';
 import { Booking } from '@/lib/types';
 import dynamic from 'next/dynamic';
 import styles from '../page.module.css';
@@ -10,7 +10,7 @@ import styles from '../page.module.css';
 const Map = dynamic(() => import('@/components/Map'), { ssr: false });
 
 export default function BookingsAdmin() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -29,8 +29,17 @@ export default function BookingsAdmin() {
 
   const handleStatusChange = async (booking: Booking, newStatus: Booking['status']) => {
     if (!user) return;
-    await adminUpdateBookingStatus(booking.id, newStatus, user.uid, user.email || '', booking.status);
-    fetchBookings();
+    try {
+      await adminTransitionBookingState(
+        booking.id, 
+        newStatus, 
+        { uid: user.uid, email: user.email || '', role: role as any }, 
+        booking.status
+      );
+      fetchBookings();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : 'Transition failed');
+    }
   };
 
   const filteredBookings = bookings.filter(b => {
@@ -45,14 +54,15 @@ export default function BookingsAdmin() {
         <p>Monitor and update test schedules.</p>
       </header>
 
-      <div className={styles.filters} style={{ marginBottom: 24, display: 'flex', gap: 12 }}>
-        {['all', 'pending', 'confirmed', 'completed'].map(f => (
+      <div className={styles.filters} style={{ marginBottom: 24, display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+        {['all', 'BOOKED', 'PAYMENT_PENDING', 'PAYMENT_CONFIRMED', 'SAMPLE_COLLECTED', 'IN_ANALYSIS', 'VERIFIED', 'CLOSED'].map(f => (
           <button 
             key={f}
             className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-outline'}`}
+            style={{ whiteSpace: 'nowrap' }}
             onClick={() => setFilter(f)}
           >
-            {f.toUpperCase()}
+            {f.replace('_', ' ')}
           </button>
         ))}
       </div>
@@ -84,13 +94,16 @@ export default function BookingsAdmin() {
                   </button>
                 </td>
                 <td>
-                  <span className={`badge ${b.status === 'completed' ? 'badge-green' : b.status === 'confirmed' ? 'badge-blue' : 'badge-yellow'}`}>
-                    {b.status}
+                  <span className={`badge ${b.status === 'CLOSED' ? 'badge-green' : b.status.includes('PAYMENT') ? 'badge-yellow' : 'badge-blue'}`}>
+                    {b.status.replace('_', ' ')}
                   </span>
                 </td>
                 <td>
-                  {b.status === 'pending' && (
-                    <button className="btn btn-sm btn-outline" onClick={() => handleStatusChange(b, 'confirmed')}>Confirm</button>
+                  {(b.status === 'BOOKED' || b.status === 'PAYMENT_PENDING') && (
+                    <button className="btn btn-sm btn-outline" onClick={() => handleStatusChange(b, 'PAYMENT_CONFIRMED')}>Confirm</button>
+                  )}
+                  {b.status === 'PAYMENT_CONFIRMED' && (
+                    <button className="btn btn-sm btn-primary" onClick={() => handleStatusChange(b, 'ASSIGNED_TO_LAB')}>Assign Lab</button>
                   )}
                   <button className="btn btn-sm btn-ghost" onClick={() => setSelectedBooking(b)}>Details</button>
                 </td>

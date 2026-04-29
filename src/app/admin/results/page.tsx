@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { adminGetAllBookings, adminCreateResult, adminUpdateBookingStatus } from '@/lib/admin';
+import { adminGetAllBookings, adminCreateResult, adminTransitionBookingState } from '@/lib/admin';
 import { Booking } from '@/lib/types';
 import { generateInterpretation, suggestFlag } from '@/lib/medical';
 import styles from '../page.module.css';
 
 export default function MedicalResultsAdmin() {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -77,7 +77,12 @@ export default function MedicalResultsAdmin() {
         status: 'reviewed'
       }, user.uid, user.email || '');
 
-      await adminUpdateBookingStatus(selectedBooking.id, 'completed', user.uid, user.email || '', selectedBooking.status);
+      await adminTransitionBookingState(
+        selectedBooking.id, 
+        'CLOSED', 
+        { uid: user.uid, email: user.email || '', role: role as any }, 
+        selectedBooking.status
+      );
       
       setSelectedBooking(null);
       setForm({ doctorNotes: '', rawResults: '', flag: 'NORMAL', followUpAction: '', urgentConfirmed: false });
