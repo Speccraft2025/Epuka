@@ -1,69 +1,181 @@
-# Epuka: Preventive Healthcare Operations Engine
-
-## 🏷️ Project Identity
-**Project Name**: Epuka  
-**Vision**: To democratize preventive healthcare in Kenya through a digital-first, operations-driven diagnostic platform.  
-**Core Mission**: To move from "reactive" medicine to "proactive" health management by simplifying lab testing, result interpretation, and medical logistics.
+# Epuka — Preventive Healthcare Operations Engine
+### Project Brief v2.0 · April 2026
 
 ---
 
-## 🏗️ Technical Architecture
-- **Framework**: Next.js 14 (App Router)
-- **Primary Language**: TypeScript (100% Type Safe)
-- **Database**: Google Firestore (NoSQL)
-- **Authentication**: Firebase Auth (Google OAuth)
-- **Mapping**: Leaflet + OpenStreetMap (Dynamic Pin-Drop & Reverse Geocoding)
-- **Styling**: Vanilla CSS (Premium Dark Theme / Operational Minimalist UI)
-- **Deployment**: Netlify (CI/CD Pipeline)
+## 1. Mission
+
+Epuka is a **workflow-first healthcare logistics platform** built for the Kenyan preventive health market. It coordinates every step of a diagnostic test — from a patient booking their first blood panel to a medical professional securely releasing their results — with strict operational accountability at every step.
+
+> **Core Principle**: Every role in the system sees exactly what they need to do next. Nothing more. Nothing less.
 
 ---
 
-## ⚡ The "Operations Engine" Workflow
-Epuka is built as a prioritized workflow engine, ensuring that every role in the health ecosystem has a clear "Today's Work" queue.
+## 2. System Architecture
 
-### 🧩 Role-Based Access Control (RBAC)
-1.  **PATIENT**: Can book tests via interactive maps and view interpreted health results with visual range indicators.
-2.  **OPS (Operations)**: Manages payment verification and sample collection logistics via the "Logistics Queue."
-3.  **MEDICAL_ADMIN**: Reviews lab data, utilizes the AI Assistant for interpretations, and releases validated reports.
-4.  **SUPER_ADMIN**: Oversees the entire system, manages staff roles, and monitors immutable audit logs.
-
----
-
-## 🔬 Medical Intelligence Layer
-The system includes a clinical logic engine (`src/lib/medical.ts`) designed to assist medical staff:
-- **Auto-Interpretation**: Analyzes raw values for Cholesterol, Glucose, and Blood Pressure to suggest patient-friendly clinical notes.
-- **Severity Flagging**: Automatically suggests `NORMAL`, `ATTENTION`, or `URGENT` status based on laboratory ranges.
-- **Safety Lock**: Enforces a mandatory manual review and follow-up documentation for all **URGENT** cases before they can be released to patients.
+| Layer | Technology |
+|---|---|
+| **Frontend** | Next.js 14 (App Router, Server + Client Components) |
+| **Database** | Firestore (NoSQL, real-time) |
+| **Authentication** | Firebase Auth (Google OAuth) |
+| **Maps** | Leaflet + OpenStreetMap (no paid API key required) |
+| **Deployment** | Netlify (CI/CD via GitHub push) |
+| **Styling** | Vanilla CSS (dark, operational UI) |
+| **Language** | TypeScript (strict mode) |
 
 ---
 
-## 📍 Geographical & Logistics Integration
-- **Split-Screen Lab Selection**: Integrated map and list view for partner laboratory selection.
-- **Home Collection Pin-Drop**: Interactive map interface that allows users to drop a pin at their exact location, capturing precise coordinates and reverse-geocoded addresses.
-- **Admin Map Previews**: Real-time map rendering in the admin panel to assist nurses and couriers in finding collection sites.
+## 3. Who Uses Epuka
+
+### 👤 Patient
+Books diagnostic tests, tracks their sample through the lab process, and receives interpreted results once a medical professional has reviewed and approved them.
+
+### 🔧 OPS Team
+Manages the logistics queue — verifying M-Pesa payments, coordinating home collection routes, and assigning samples to partner labs.
+
+### 🔬 Medical Admin
+Reviews raw lab values, uses the AI-assisted interpretation engine, and personally approves results before they are visible to patients. Urgent cases are locked until explicitly signed off.
+
+### 🛡️ Super Admin
+Full system access — manages user roles, views the complete immutable audit ledger, and can override any system state (with mandatory logging).
 
 ---
 
-## 📊 Data Schema Summary
+## 4. The Booking Lifecycle (State Machine)
 
-### 1. `users`
-Profiles containing authentication details, demographic data (age, gender, lifestyle), and system roles.
+Every booking in Epuka follows a strict, linear 9-step lifecycle. **No step can be skipped.**
 
-### 2. `bookings`
-The central transaction record tracking test panels, collection methods, payment status, and precise geographical locations.
+```
+BOOKED
+  ↓  Patient submits booking
+PAYMENT_PENDING
+  ↓  OPS initiates payment verification
+PAYMENT_CONFIRMED
+  ↓  OPS assigns to partner lab
+ASSIGNED_TO_LAB
+  ↓  Courier picks up / patient visits lab
+SAMPLE_COLLECTED
+  ↓  Lab begins processing
+IN_ANALYSIS
+  ↓  Medical Admin enters and reviews results
+VERIFIED
+  ↓  Results approved and dispatched to patient
+DELIVERED
+  ↓  Cycle complete
+CLOSED
+```
 
-### 3. `results`
-Medical reports containing raw indicators, visual range data, doctor's interpretations, and safety flags.
-
-### 4. `labs`
-A dynamic collection of partner diagnostic centers with coordinates, active status, and neighborhood details.
-
-### 5. `audit_logs`
-An immutable ledger of every administrative action, providing full transparency on status changes, payment approvals, and role updates.
+All transitions are validated server-side. An OPS user cannot skip from `BOOKED` to `SAMPLE_COLLECTED`. A Medical Admin cannot release results from a booking still in `IN_ANALYSIS`. Every transition is recorded in an **immutable audit log**.
 
 ---
 
-## 🚀 Deployment & Maintenance
-- **Environment**: Managed via `.env.local` for development and Netlify Environment Variables for production.
-- **Security Rules**: Hardened `firestore.rules` that enforce RBAC at the database level, preventing unauthorized cross-collection access.
-- **Scaling**: Built on a serverless architecture (Firebase + Next.js Server Components) to handle high concurrent traffic with zero server management overhead.
+## 5. Operations Dashboard (Role-Based)
+
+### OPS Queue (`/admin`)
+| Queue | Trigger Condition |
+|---|---|
+| 🟡 New Bookings | `status = BOOKED` |
+| 🟡 Payment Pending | `status = PAYMENT_PENDING` |
+| 🟢 Ready for Collection | `status = PAYMENT_CONFIRMED` |
+| 🔵 Active Logistics | `status = ASSIGNED_TO_LAB or SAMPLE_COLLECTED` |
+
+### Medical Queue (`/admin`)
+| Queue | Trigger Condition |
+|---|---|
+| 🔴 Urgent — Awaiting Sign-off | `flag = URGENT, medicalApprovalStatus = PENDING` |
+| 🔵 Pending Review | `medicalApprovalStatus = PENDING` |
+| 🟢 Approved Today | `medicalApprovalStatus = APPROVED` |
+
+---
+
+## 6. Medical Intelligence Layer
+
+Epuka includes a **rule-based clinical guidance engine** (`src/lib/medical.ts`).
+
+- Interprets common lab values: Glucose, Cholesterol (LDL/HDL), Blood Pressure, HbA1c
+- Outputs a severity flag: `NORMAL` | `ATTENTION` | `URGENT`
+- Detects anomalous readings (physiologically impossible values)
+- All suggestions are labelled: **"Clinical Guidance Support — Not a Diagnosis"**
+
+**Safety Lock**: Any result flagged `URGENT` is locked from patient view. It requires a Medical Admin to:
+1. Manually confirm review
+2. Document a follow-up action
+3. Click explicit approval
+
+---
+
+## 7. Geolocation & Logistics Map
+
+- **Patient Booking**: Pin-drop home collection location with automatic reverse geocoding (Nominatim API)
+- **Lab Selection**: Interactive map showing all active partner labs
+- **OPS Logistics View** (`/admin/logistics`): Live command map displaying all active collection points vs. destination labs for route coordination
+
+---
+
+## 8. Database Collections (Firestore)
+
+| Collection | Purpose |
+|---|---|
+| `users` | Auth data, roles, demographic profiles |
+| `bookings` | Full lifecycle record per test booking |
+| `results` | Raw lab values, interpretations, approval status |
+| `labs` | Dynamic registry of partner diagnostic centers |
+| `audit_logs` | **Immutable**. Every admin action, timestamped |
+
+---
+
+## 9. Security Model (RBAC)
+
+Firestore rules enforce role-based access at the database level:
+
+- **Patients** can only read their own approved results (`medicalApprovalStatus = APPROVED`)
+- **OPS** can read all bookings but cannot touch medical records
+- **Medical Admins** can create/edit results but cannot access system settings
+- **Audit logs** are **append-only** — no role can edit or delete them
+- **Closed bookings** cannot be modified by any non-Super Admin
+
+---
+
+## 10. Live Routes
+
+| Route | Who | Purpose |
+|---|---|---|
+| `/` | Public | Marketing landing page |
+| `/tests` | Patient | Browse and book a test panel |
+| `/dashboard` | Patient | Booking tracker + results portal |
+| `/results` | Patient | Interpreted health results |
+| `/onboarding` | Patient | Health profile setup |
+| `/admin` | OPS + Medical | Today's Work Queue |
+| `/admin/bookings` | OPS | Booking state management |
+| `/admin/payments` | OPS | M-Pesa payment verification |
+| `/admin/logistics` | OPS | Live collection map |
+| `/admin/results` | Medical | Lab result entry + approval |
+| `/admin/users` | Super Admin | Role management |
+| `/admin/audit` | Super Admin | Immutable system audit log |
+
+---
+
+## 11. Deployment
+
+- **Repository**: GitHub (`Speccraft2025/Epuka`)
+- **CI/CD**: Every push to `main` triggers an automatic Netlify build
+- **Environment**: Firebase keys stored as Netlify Environment Variables
+- **Build**: `npm run build` → Next.js static + SSR output → `.next`
+
+---
+
+## 12. Current Status
+
+| Area | Status |
+|---|---|
+| State Machine (9 states) | ✅ Live |
+| RBAC Security Rules | ✅ Deployed to Firestore |
+| OPS Logistics Map | ✅ Live |
+| Medical Safety Lock | ✅ Live |
+| Patient Lifecycle Tracker | ✅ Live |
+| TypeScript Build | ✅ Clean (0 errors) |
+| Netlify Deployment | 🔄 Deploying (latest push) |
+
+---
+
+*Epuka — Know your numbers before they know you.*
