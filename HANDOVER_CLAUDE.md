@@ -16,7 +16,7 @@ A workflow-driven preventive-healthcare logistics platform for Kenya. It runs th
 | Security | Row Level Security + database triggers (see `supabase/migrations`) |
 | Maps | Leaflet + OpenStreetMap / Nominatim (no paid keys) |
 | Styling | Vanilla CSS, dark clinical theme |
-| Hosting | Netlify, auto-deploys from `main` on GitHub `Speccraft2025/Epuka` |
+| Hosting | Netlify project `epuka1` → https://epuka1.netlify.app, auto-deploys from `main` on GitHub `Speccraft2025/Epuka` |
 
 Firebase was removed on 21 Oct 2026. Any data still in the old Firestore project was **not** migrated.
 
@@ -62,9 +62,9 @@ Firebase was removed on 21 Oct 2026. Any data still in the old Firestore project
 The SHIFT app (`shift-epuka.netlify.app`) uses the same Supabase project and auth user pool. Its tables are prefixed `shift_`. A SHIFT signup also gets an Epuka `profiles` row (as a PATIENT). That is harmless.
 
 ## Setup checklist (Supabase dashboard)
-1. **Migrations:** apply everything in `supabase/migrations` in filename order, if it isn't already applied. `20261021090000_audit_labels.sql` is new as of 21 Oct.
-2. **Auth → URL configuration:** add `https://<epuka-netlify-domain>/auth/callback` and `http://localhost:3000/auth/callback` to the redirect allow-list.
-3. **Auth → Providers → Google:** enable it with a Google OAuth client ID and secret. The Google console redirect URI is `https://dzflksuhykpeupznqibt.supabase.co/auth/v1/callback`. Email magic links work without this step.
+1. **Migrations:** ✅ all 8 are applied on the live project (the July 7 plus `20261021090000_audit_labels`, applied 21 Oct).
+2. **Auth → URL configuration:** add `https://epuka1.netlify.app/**` and `http://localhost:3000/auth/callback` to the redirect allow-list.
+3. **Auth → Providers → Google:** currently **disabled**. Enable it with a Google OAuth client ID and secret. The Google console redirect URI is `https://dzflksuhykpeupznqibt.supabase.co/auth/v1/callback`. Email magic links work without this step.
 4. **First Super Admin:** sign in once, then in the SQL editor run
    `update public.profiles set role = 'SUPER_ADMIN' where email = 'you@example.com';`
    After that, manage roles from `/admin/users`.

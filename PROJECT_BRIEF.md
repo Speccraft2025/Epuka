@@ -174,9 +174,9 @@ Row Level Security policies and triggers enforce role-based access at the databa
 |---|---|
 | Supabase port (auth, data, admin) | ✅ Done — Firebase removed (21 Oct 2026) |
 | State machine, RBAC, safety lock, audit triggers | ✅ In migrations; verified on a local Postgres |
-| Migrations on live Supabase project | ⚠️ Confirm all applied (incl. `20261021090000_audit_labels`) |
-| Google sign-in | ⚠️ Enable Google provider + add `/auth/callback` to redirect allow-list |
-| Email magic-link sign-in | ✅ Built (needs the redirect allow-list entry) |
+| Migrations on live Supabase project | ✅ All 8 applied |
+| Google sign-in | ⚠️ Google provider disabled in Supabase; needs OAuth client |
+| Email magic-link sign-in | ⚠️ Built; needs `https://epuka1.netlify.app/**` in the Supabase redirect allow-list |
 | TypeScript Build | ✅ Clean (0 errors) |
 | Automated tests | ❌ None yet |
 | M-Pesa API | ❌ Manual code matching only |
