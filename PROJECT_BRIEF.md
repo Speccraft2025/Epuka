@@ -1,5 +1,5 @@
 # Epuka — Preventive Healthcare Operations Engine
-### Project Brief v2.0 · April 2026
+### Project Brief v3.0 · October 2026
 
 ---
 
@@ -16,8 +16,8 @@ Epuka is a **workflow-first healthcare logistics platform** built for the Kenyan
 | Layer | Technology |
 |---|---|
 | **Frontend** | Next.js 14 (App Router, Server + Client Components) |
-| **Database** | Firestore (NoSQL, real-time) |
-| **Authentication** | Firebase Auth (Google OAuth) |
+| **Database** | Supabase Postgres (Row Level Security, triggers) |
+| **Authentication** | Supabase Auth (Google OAuth + email magic link) |
 | **Maps** | Leaflet + OpenStreetMap (no paid API key required) |
 | **Deployment** | Netlify (CI/CD via GitHub push) |
 | **Styling** | Vanilla CSS (dark, operational UI) |
@@ -65,7 +65,7 @@ DELIVERED
 CLOSED
 ```
 
-All transitions are validated server-side. An OPS user cannot skip from `BOOKED` to `SAMPLE_COLLECTED`. A Medical Admin cannot release results from a booking still in `IN_ANALYSIS`. Every transition is recorded in an **immutable audit log**.
+All transitions are validated in the database (`bookings_guard_update` trigger). An OPS user cannot skip from `BOOKED` to `SAMPLE_COLLECTED`. A Medical Admin cannot release results from a booking still in `IN_ANALYSIS`. Every transition is recorded in an **immutable audit log**, written by a database trigger in the same transaction.
 
 ---
 
@@ -112,11 +112,12 @@ Epuka includes a **rule-based clinical guidance engine** (`src/lib/medical.ts`).
 
 ---
 
-## 8. Database Collections (Firestore)
+## 8. Database Tables (Supabase Postgres)
 
-| Collection | Purpose |
+| Table | Purpose |
 |---|---|
-| `users` | Auth data, roles, demographic profiles |
+| `profiles` | One per signed-up user: role and onboarding demographics |
+| `tests` | Bookable test panels and prices |
 | `bookings` | Full lifecycle record per test booking |
 | `results` | Raw lab values, interpretations, approval status |
 | `labs` | Dynamic registry of partner diagnostic centers |
@@ -126,12 +127,14 @@ Epuka includes a **rule-based clinical guidance engine** (`src/lib/medical.ts`).
 
 ## 9. Security Model (RBAC)
 
-Firestore rules enforce role-based access at the database level:
+Row Level Security policies and triggers enforce role-based access at the database level:
 
-- **Patients** can only read their own approved results (`medicalApprovalStatus = APPROVED`)
-- **OPS** can read all bookings but cannot touch medical records
+- **Patients** can only read their own results once approved **and** delivered, and cannot mark their own booking as paid
+- **OPS** can read and advance all bookings but have no access to medical records
 - **Medical Admins** can create/edit results but cannot access system settings
-- **Audit logs** are **append-only** — no role can edit or delete them
+- **Audit logs** are written only by database triggers. No client role can insert, edit or delete them
+- **Roles** can only be changed by a Super Admin
+- **URGENT** results cannot be approved without a documented follow-up action (database constraint)
 - **Closed bookings** cannot be modified by any non-Super Admin
 
 ---
@@ -159,7 +162,8 @@ Firestore rules enforce role-based access at the database level:
 
 - **Repository**: GitHub (`Speccraft2025/Epuka`)
 - **CI/CD**: Every push to `main` triggers an automatic Netlify build
-- **Environment**: Firebase keys stored as Netlify Environment Variables
+- **Environment**: public Supabase URL + publishable key in `netlify.toml`
+- **Schema**: `supabase/migrations/`, applied to the Supabase project **Epuka Project**
 - **Build**: `npm run build` → Next.js static + SSR output → `.next`
 
 ---
@@ -168,13 +172,14 @@ Firestore rules enforce role-based access at the database level:
 
 | Area | Status |
 |---|---|
-| State Machine (9 states) | ✅ Live |
-| RBAC Security Rules | ✅ Deployed to Firestore |
-| OPS Logistics Map | ✅ Live |
-| Medical Safety Lock | ✅ Live |
-| Patient Lifecycle Tracker | ✅ Live |
+| Supabase port (auth, data, admin) | ✅ Done — Firebase removed (21 Oct 2026) |
+| State machine, RBAC, safety lock, audit triggers | ✅ In migrations; verified on a local Postgres |
+| Migrations on live Supabase project | ⚠️ Confirm all applied (incl. `20261021090000_audit_labels`) |
+| Google sign-in | ⚠️ Enable Google provider + add `/auth/callback` to redirect allow-list |
+| Email magic-link sign-in | ✅ Built (needs the redirect allow-list entry) |
 | TypeScript Build | ✅ Clean (0 errors) |
-| Netlify Deployment | 🔄 Deploying (latest push) |
+| Automated tests | ❌ None yet |
+| M-Pesa API | ❌ Manual code matching only |
 
 ---
 

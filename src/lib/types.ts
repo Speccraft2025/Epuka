@@ -1,5 +1,13 @@
 export type UserRole = 'SUPER_ADMIN' | 'MEDICAL_ADMIN' | 'OPS' | 'PATIENT';
 
+/** The signed-in account, as the UI needs it (mapped from the Supabase auth user). */
+export interface AppUser {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
+
 export interface UserProfile {
   uid: string;
   displayName: string;
@@ -7,6 +15,7 @@ export interface UserProfile {
   photoURL?: string;
   role: UserRole;
   createdAt: Date;
+  /** null until /onboarding has been completed. */
   profile: {
     age: number;
     gender: string;
@@ -17,7 +26,7 @@ export interface UserProfile {
       alcohol: boolean;
       exercise: string; // 'none' | 'light' | 'moderate' | 'heavy'
     };
-  };
+  } | null;
 }
 
 export interface Test {
@@ -105,13 +114,16 @@ export interface Result {
   followUpAction?: string;
   status: 'pending' | 'reviewed';
   medicalApprovalStatus: 'PENDING' | 'APPROVED' | 'REJECTED';
+  approvedBy?: string | null;
+  approvedAt?: Date | null;
   createdAt: Date;
 }
 
 export interface AuditLog {
   id: string;
-  userId: string;
-  userEmail: string;
+  userId: string | null;
+  userEmail: string | null;
+  userRole: UserRole | null;
   action: string;
   entityId: string;
   entityType: 'booking' | 'result' | 'user' | 'payment';

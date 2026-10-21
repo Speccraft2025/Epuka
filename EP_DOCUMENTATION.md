@@ -12,7 +12,7 @@ To empower Kenyans with "Know Your Health, Act Before It's Late" through accessi
 ### Tech Stack
 - **Frontend**: Next.js 14 (App Router)
 - **Styling**: Vanilla CSS (Premium Dark Mode)
-- **Backend**: Firebase (Authentication, Firestore, Hosting)
+- **Backend**: Supabase (Postgres, Auth, Row Level Security)
 - **Deployment**: Netlify (CI/CD)
 - **Security**: Granular RBAC (Role-Based Access Control)
 
@@ -27,12 +27,12 @@ To empower Kenyans with "Know Your Health, Act Before It's Late" through accessi
 
 ### 1. Booking a Test
 1.  **Select Test**: Browse panels (Basic, Heart, Full Body) and click **Book Now**.
-2.  **Authenticate**: Sign in securely with your Google Account.
+2.  **Authenticate**: Sign in with Google, or with a one-time link sent to your email.
 3.  **Choose Collection**:
     - **Lab Visit**: Select the nearest partner lab from our map-integrated list.
     - **Home Collection**: Provide your physical address for a mobile nurse visit.
 4.  **Schedule**: Select your preferred date.
-5.  **Payment**: Note the total, pay via M-Pesa, and input the Transaction Code to trigger verification.
+5.  **Payment**: Note the total, pay via M-Pesa, and input the Transaction Code. Our team confirms it against the M-Pesa statement.
 
 ### 2. Viewing Results
 - Access the **My Results** dashboard.
@@ -45,12 +45,12 @@ To empower Kenyans with "Know Your Health, Act Before It's Late" through accessi
 ## 🔐 Admin Usage Manual (Operations)
 
 ### Accessing the Control Center
-The admin panel is located at `/admin`. You must have an authorized role (`SUPER_ADMIN`, `MEDICAL_ADMIN`, or `OPS`) assigned in Firestore.
+The admin panel is located at `/admin`. You must have an authorized role (`SUPER_ADMIN`, `MEDICAL_ADMIN`, or `OPS`) assigned by a Super Admin in `/admin/users` (the very first Super Admin is set in the Supabase SQL editor; see `HANDOVER_CLAUDE.md`).
 
 ### 1. Bookings Management (All Admins)
 - View the master list of all appointments.
-- Filter by status: `Pending`, `Confirmed`, or `Completed`.
-- Manually transition bookings as logistics progress.
+- Filter by lifecycle status (`BOOKED` through `CLOSED`).
+- Advance bookings one step at a time as logistics progress. The database rejects skipped steps.
 
 ### 2. Payment Verification (Super Admin & Ops)
 - View bookings awaiting payment confirmation.
@@ -61,7 +61,8 @@ The admin panel is located at `/admin`. You must have an authorized role (`SUPER
 - Secure portal for entering lab data.
 - **Format**: Input raw data as JSON (for visual gauges) or plain text.
 - **Interpretation**: Add simplified doctor notes to help the patient understand their health status.
-- **Action**: Click **Approve & Release** to make results visible on the patient's dashboard.
+- **Urgent cases**: an URGENT flag requires a documented follow-up action and a manual-review confirmation.
+- **Action**: Click **Approve & Release**. The booking moves to `VERIFIED`, the result is signed off under your name, and the booking moves to `DELIVERED`, which makes it visible to the patient.
 
 ### 4. User Access & Audit (Super Admin Only)
 - **User Roles**: Assign staff to specific roles (e.g., promoting a user to Medical Admin).
@@ -73,24 +74,19 @@ The admin panel is located at `/admin`. You must have an authorized role (`SUPER
 
 ### Environment Variables
 The following must be configured in Netlify/Production:
-- `NEXT_PUBLIC_FIREBASE_API_KEY`
-- `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-- `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-- `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-- `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-- `NEXT_PUBLIC_FIREBASE_APP_ID`
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-### Security Rules Deployment
-If security rules need updating, run:
-```bash
-npx firebase deploy --only firestore:rules
-```
+Both are public values and are already set in `netlify.toml`.
 
-### Adding New Partner Labs
-New labs can be added by updating the `STATIC_LABS` array in `src/lib/types.ts`.
+### Schema & Security Changes
+The schema, access rules and audit triggers live in `supabase/migrations/`. Add a new timestamped migration file for each change, apply it to the Supabase project, then regenerate `src/lib/database.types.ts`.
+
+### Adding New Partner Labs or Test Panels
+Insert rows into the `labs` or `tests` tables (Super Admin only). The app reads both from the database.
 
 ---
 
 ## ⚠️ Safety & Compliance
 - **Medical Disclaimer**: Interpretations are supportive only; users are encouraged to consult their primary physicians.
-- **Data Privacy**: All patient data is protected by Firestore security rules that restrict access to the account owner and authorized medical staff only.
+- **Data Privacy**: All patient data is protected by Postgres Row Level Security that restricts access to the account owner and authorized medical staff only.

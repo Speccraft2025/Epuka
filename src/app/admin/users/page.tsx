@@ -28,7 +28,11 @@ export default function UsersAdmin() {
       alert("You cannot change your own role.");
       return;
     }
-    await adminUpdateUserRole(targetUser.uid, newRole, user.uid, user.email || '', targetUser.role);
+    try {
+      await adminUpdateUserRole(targetUser.uid, newRole);
+    } catch (e) {
+      alert(`Role change failed: ${e instanceof Error ? e.message : e}`);
+    }
     fetchUsers();
   };
 
@@ -60,7 +64,7 @@ export default function UsersAdmin() {
                     {u.role}
                   </span>
                 </td>
-                <td>{new Date((u.createdAt as any).seconds * 1000).toLocaleDateString()}</td>
+                <td>{new Date(u.createdAt).toLocaleDateString()}</td>
                 <td>
                   <select 
                     className="form-input" 

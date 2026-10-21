@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserBookings, getUserProfile, getUserResults } from '@/lib/firestore';
+import { getUserBookings, getUserProfile, getUserResults } from '@/lib/data';
 import { Booking, Result, UserProfile } from '@/lib/types';
 import Navbar from '@/components/Navbar';
 import Link from 'next/link';
@@ -150,7 +150,7 @@ export default function DashboardPage() {
                     <div className={styles.bookingInfo}>
                       <span className={styles.bookingName}>{b.testName}</span>
                       <span className={styles.bookingDate}>
-                        {b.date ? new Date((b.date as unknown as { seconds: number }).seconds * 1000).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                        {b.date ? new Date(b.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
                       </span>
                       <div className={styles.bookingLocation}>
                         {b.collectionMethod === 'lab' ? `🏢 ${b.labName}` : `🏠 ${b.homeAddress?.split(',')[0]}`}

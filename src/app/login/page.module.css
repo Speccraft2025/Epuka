@@ -1,0 +1,51 @@
+.card h1 {
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.lede {
+  color: var(--clr-text-dim);
+  margin-bottom: 32px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 24px 0;
+  color: var(--clr-text-muted);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--clr-border);
+}
+
+.full {
+  width: 100%;
+  justify-content: center;
+}
+
+.note {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  background: rgba(52, 211, 153, 0.1);
+  color: var(--clr-green);
+}
+
+.error {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  font-size: 0.9rem;
+  background: rgba(248, 113, 113, 0.12);
+  color: var(--clr-danger);
+}

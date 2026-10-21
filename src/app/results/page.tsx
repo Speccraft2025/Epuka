@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getUserResults } from '@/lib/firestore';
+import { getUserResults } from '@/lib/data';
 import { Result } from '@/lib/types';
 import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
@@ -76,7 +76,7 @@ export default function ResultsPage() {
               <p>Detailed analysis of your latest laboratory markers.</p>
             </div>
             {latest && (
-              <span className={styles.date}>Report Date: {new Date((latest.createdAt as any).seconds * 1000).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+              <span className={styles.date}>Report Date: {new Date(latest.createdAt).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
             )}
           </div>
 

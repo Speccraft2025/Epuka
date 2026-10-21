@@ -19,7 +19,7 @@ const HOW_IT_WORKS = [
 ];
 
 export default function HomePage() {
-  const { user, signInWithGoogle } = useAuth();
+  const { user, signIn } = useAuth();
 
   return (
     <>
@@ -44,8 +44,8 @@ export default function HomePage() {
                     <Link href="/tests" className="btn btn-primary btn-lg">Book a Test →</Link>
                   ) : (
                     <>
-                      <button className="btn btn-primary btn-lg" onClick={signInWithGoogle}>
-                        Sign in with Google
+                      <button className="btn btn-primary btn-lg" onClick={signIn}>
+                        Sign in
                       </button>
                       <Link href="#how" className="btn btn-outline btn-lg">How it works</Link>
                     </>
@@ -99,7 +99,7 @@ export default function HomePage() {
               {user ? (
                 <Link href="/tests" className="btn btn-primary btn-lg">Browse Tests</Link>
               ) : (
-                <button className="btn btn-primary btn-lg" onClick={signInWithGoogle}>
+                <button className="btn btn-primary btn-lg" onClick={signIn}>
                   Get Started Free
                 </button>
               )}

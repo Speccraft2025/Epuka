@@ -1,24 +1,22 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import {
-  User,
-  onAuthStateChanged,
-  signInWithPopup,
-  signOut,
-} from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db, googleProvider } from '@/lib/firebase';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import type { User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
-
-import { UserRole } from '@/lib/types';
+import { getSupabase, isSupabaseConfigured } from '@/lib/supabase';
+import { AppUser, UserRole } from '@/lib/types';
 
 interface AuthContextType {
-  user: User | null;
+  user: AppUser | null;
   loading: boolean;
   profileComplete: boolean;
   role: UserRole;
+  /** Sends the visitor to the sign-in page. */
+  signIn: () => void;
   signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string) => Promise<void>;
+  /** Re-reads role/onboarding state, e.g. after onboarding is saved. */
+  refreshProfile: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -27,96 +25,136 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   profileComplete: false,
   role: 'PATIENT',
+  signIn: () => {},
   signInWithGoogle: async () => {},
+  signInWithEmail: async () => {},
+  refreshProfile: async () => {},
   logout: async () => {},
 });
 
+function toAppUser(u: User): AppUser {
+  const meta = u.user_metadata ?? {};
+  return {
+    uid: u.id,
+    email: u.email ?? null,
+    displayName: meta.full_name ?? meta.name ?? (u.email ? u.email.split('@')[0] : null),
+    photoURL: meta.avatar_url ?? meta.picture ?? null,
+  };
+}
+
+/** Where the OAuth / magic-link round trip lands. */
+function callbackUrl() {
+  return `${window.location.origin}/auth/callback`;
+}
+
+/** Where a signed-in user belongs, given their profile state. */
+export function homeFor(role: UserRole, profileComplete: boolean) {
+  if (role !== 'PATIENT') return '/admin';
+  return profileComplete ? '/dashboard' : '/onboarding';
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileComplete, setProfileComplete] = useState(false);
   const [role, setRole] = useState<UserRole>('PATIENT');
   const router = useRouter();
 
-  useEffect(() => {
-    const firestore = db;
-    if (!auth || !firestore) {
-      setLoading(false);
-      return;
+  const loadProfile = useCallback(async (userId: string) => {
+    try {
+      const { data, error } = await getSupabase()
+        .from('profiles')
+        .select('role, age')
+        .eq('id', userId)
+        .maybeSingle();
+      if (error) throw error;
+      setRole(data?.role ?? 'PATIENT');
+      setProfileComplete(data?.age != null);
+    } catch (e) {
+      console.error('Error fetching profile:', e);
+      setRole('PATIENT');
+      setProfileComplete(false);
     }
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        try {
-          const userDoc = await getDoc(doc(firestore, 'users', firebaseUser.uid));
-          const userData = userDoc.data();
-          setProfileComplete(userDoc.exists() && !!userData?.profile?.age);
-          setRole(userData?.role || 'PATIENT');
-        } catch (e) {
-          console.error('Error fetching profile:', e);
-          setProfileComplete(false);
-          setRole('PATIENT');
-        }
-      } else {
-        setProfileComplete(false);
-        setRole('PATIENT');
-      }
-      setLoading(false);
-    });
-    return () => unsubscribe();
   }, []);
 
-  const signInWithGoogle = async () => {
-    const firestore = db;
-    if (!auth || !firestore) {
-      alert('Authentication is not configured. Please check your environment variables.');
+  useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
       return;
     }
-    try {
-      const result = await signInWithPopup(auth, googleProvider);
+    const supabase = getSupabase();
+    let active = true;
 
-      const firebaseUser = result.user;
-      const userRef = doc(firestore, 'users', firebaseUser.uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        const newUserProfile = {
-          uid: firebaseUser.uid,
-          displayName: firebaseUser.displayName,
-          email: firebaseUser.email,
-          photoURL: firebaseUser.photoURL,
-          role: 'PATIENT' as UserRole,
-          createdAt: new Date(),
-          profile: null,
-        };
-        await setDoc(userRef, newUserProfile);
-        setRole('PATIENT');
-        router.push('/onboarding');
+    const apply = async (sbUser: User | null) => {
+      if (!active) return;
+      if (sbUser) {
+        setUser(toAppUser(sbUser));
+        await loadProfile(sbUser.id);
       } else {
-        const userData = userSnap.data();
-        setRole(userData?.role || 'PATIENT');
-        if (!userData?.profile?.age) {
-          router.push('/onboarding');
-        } else if (userData?.role && userData.role !== 'PATIENT') {
-          router.push('/admin');
-        } else {
-          router.push('/dashboard');
-        }
+        setUser(null);
+        setRole('PATIENT');
+        setProfileComplete(false);
       }
-    } catch (error) {
-      console.error('Sign in error:', error);
-    }
+      if (active) setLoading(false);
+    };
+
+    supabase.auth.getSession().then(({ data }) => apply(data.session?.user ?? null));
+
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      // INITIAL_SESSION is covered by getSession above; token refreshes don't
+      // change who the user is.
+      if (event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') return;
+      // Defer out of the callback: awaiting Supabase calls inside it can deadlock.
+      setTimeout(() => apply(session?.user ?? null), 0);
+    });
+
+    return () => {
+      active = false;
+      sub.subscription.unsubscribe();
+    };
+  }, [loadProfile]);
+
+  const signIn = () => router.push('/login');
+
+  const signInWithGoogle = async () => {
+    const { error } = await getSupabase().auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: callbackUrl() },
+    });
+    if (error) throw error;
+  };
+
+  const signInWithEmail = async (email: string) => {
+    const { error } = await getSupabase().auth.signInWithOtp({
+      email: email.trim(),
+      options: { emailRedirectTo: callbackUrl() },
+    });
+    if (error) throw error;
+  };
+
+  const refreshProfile = async () => {
+    if (user) await loadProfile(user.uid);
   };
 
   const logout = async () => {
-    if (auth) await signOut(auth);
+    if (isSupabaseConfigured) await getSupabase().auth.signOut();
     router.push('/');
   };
 
-
   return (
-    <AuthContext.Provider value={{ user, loading, profileComplete, role, signInWithGoogle, logout }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        profileComplete,
+        role,
+        signIn,
+        signInWithGoogle,
+        signInWithEmail,
+        refreshProfile,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

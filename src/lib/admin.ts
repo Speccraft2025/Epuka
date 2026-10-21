@@ -1,194 +1,219 @@
-import { 
-  collection, 
-  query, 
-  where, 
-  getDocs, 
-  doc, 
-  updateDoc, 
-  addDoc, 
-  orderBy, 
-  limit, 
-  Timestamp,
-  getDoc,
-  serverTimestamp
-} from 'firebase/firestore';
-import { db } from './firebase';
-import { Booking, Result, UserProfile, UserRole, AuditLog, BookingStatus, Lab } from './types';
+import { getSupabase } from './supabase';
+import { toBooking, toLab, toResult, toUserProfile, unwrap, unwrapOne } from './data';
+import { AuditLog, Booking, BookingStatus, Lab, Result, UserProfile, UserRole } from './types';
 
+/**
+ * The lifecycle graph, mirrored from private.booking_transitions. The
+ * database is what enforces it (bookings_guard_update trigger); this copy is
+ * only used to render the "next step" buttons and to walk a booking forward.
+ */
 export const ALLOWED_TRANSITIONS: Record<BookingStatus, BookingStatus[]> = {
-  'BOOKED': ['PAYMENT_PENDING', 'CLOSED'],
-  'PAYMENT_PENDING': ['PAYMENT_CONFIRMED', 'CLOSED'],
-  'PAYMENT_CONFIRMED': ['ASSIGNED_TO_LAB'],
-  'ASSIGNED_TO_LAB': ['SAMPLE_COLLECTED'],
-  'SAMPLE_COLLECTED': ['IN_ANALYSIS'],
-  'IN_ANALYSIS': ['VERIFIED'],
-  'VERIFIED': ['DELIVERED'],
-  'DELIVERED': ['CLOSED'],
-  'CLOSED': []
+  BOOKED: ['PAYMENT_PENDING', 'CLOSED'],
+  PAYMENT_PENDING: ['PAYMENT_CONFIRMED', 'CLOSED'],
+  PAYMENT_CONFIRMED: ['ASSIGNED_TO_LAB'],
+  ASSIGNED_TO_LAB: ['SAMPLE_COLLECTED'],
+  SAMPLE_COLLECTED: ['IN_ANALYSIS'],
+  IN_ANALYSIS: ['VERIFIED'],
+  VERIFIED: ['DELIVERED'],
+  DELIVERED: ['CLOSED'],
+  CLOSED: [],
 };
 
-/**
- * AUDIT LOGGING
- */
-export async function createAuditLog(log: Omit<AuditLog, 'id' | 'timestamp'>) {
-  if (!db) return;
-  try {
-    await addDoc(collection(db, 'audit_logs'), {
-      ...log,
-      timestamp: serverTimestamp(),
-    });
-  } catch (e) {
-    console.error('Audit log failed:', e);
+const LIFECYCLE: BookingStatus[] = [
+  'BOOKED',
+  'PAYMENT_PENDING',
+  'PAYMENT_CONFIRMED',
+  'ASSIGNED_TO_LAB',
+  'SAMPLE_COLLECTED',
+  'IN_ANALYSIS',
+  'VERIFIED',
+  'DELIVERED',
+  'CLOSED',
+];
+
+// Audit logging is no longer done from the browser. Triggers in
+// supabase/migrations/*_audit_logs.sql write every booking transition,
+// payment change, result creation/approval and role change in the same
+// transaction as the change itself.
+
+/* ------------------------------------------------------------------------ */
+/* BOOKINGS (all staff)                                                      */
+/* ------------------------------------------------------------------------ */
+
+export async function adminGetAllBookings(): Promise<Booking[]> {
+  const rows = unwrapOne(
+    await getSupabase()
+      .from('bookings')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(200)
+  );
+  return rows.map(toBooking);
+}
+
+/** Moves a booking one step. Invalid jumps are rejected by the database. */
+export async function adminTransitionBookingState(bookingId: string, newState: BookingStatus) {
+  unwrapOne(
+    await getSupabase()
+      .from('bookings')
+      .update({ status: newState })
+      .eq('id', bookingId)
+      .select('id')
+      .single()
+  );
+}
+
+/** Walks a booking forward one valid step at a time until it reaches `target`. */
+async function walkBookingTo(bookingId: string, from: BookingStatus, target: BookingStatus) {
+  let current = from;
+  while (LIFECYCLE.indexOf(current) < LIFECYCLE.indexOf(target)) {
+    const next = LIFECYCLE[LIFECYCLE.indexOf(current) + 1];
+    if (!ALLOWED_TRANSITIONS[current].includes(next)) {
+      throw new Error(`Cannot move booking from ${current} to ${next}`);
+    }
+    await adminTransitionBookingState(bookingId, next);
+    current = next;
   }
 }
 
-/**
- * BOOKINGS (ALL ADMINS)
- */
-export async function adminGetAllBookings() {
-  if (!db) return [];
-  const q = query(collection(db, 'bookings'), orderBy('createdAt', 'desc'), limit(100));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Booking));
-}
+/* ------------------------------------------------------------------------ */
+/* PAYMENTS (OPS + SUPER_ADMIN)                                              */
+/* ------------------------------------------------------------------------ */
 
-export async function adminTransitionBookingState(
-  bookingId: string, 
-  newState: BookingStatus, 
-  admin: { uid: string; email: string; role: UserRole },
+export async function adminVerifyPayment(
+  bookingId: string,
+  transactionCode: string,
+  status: 'paid' | 'unpaid',
   currentStatus: BookingStatus
 ) {
-  if (!db) return;
+  const nextStatus: BookingStatus = status === 'paid' ? 'PAYMENT_CONFIRMED' : 'PAYMENT_PENDING';
+  // A code taken over the phone for a BOOKED order still has to pass through
+  // PAYMENT_PENDING: the database rejects BOOKED -> PAYMENT_CONFIRMED.
+  if (currentStatus === 'BOOKED') {
+    await adminTransitionBookingState(bookingId, 'PAYMENT_PENDING');
+  }
+  unwrapOne(
+    await getSupabase()
+      .from('bookings')
+      .update({ payment_status: status, transaction_code: transactionCode, status: nextStatus })
+      .eq('id', bookingId)
+      .select('id')
+      .single()
+  );
+}
 
-  // Validation
-  if (admin.role !== 'SUPER_ADMIN' && !ALLOWED_TRANSITIONS[currentStatus]?.includes(newState)) {
-    throw new Error(`Invalid state transition: ${currentStatus} -> ${newState}`);
+/* ------------------------------------------------------------------------ */
+/* RESULTS (MEDICAL_ADMIN + SUPER_ADMIN)                                     */
+/* ------------------------------------------------------------------------ */
+
+export async function adminGetAllResults(): Promise<Result[]> {
+  const rows = unwrapOne(
+    await getSupabase().from('results').select('*').order('created_at', { ascending: false })
+  );
+  return rows.map(toResult);
+}
+
+export interface ReleaseResultInput {
+  booking: Booking;
+  rawResults: Result['rawResults'];
+  doctorNotes: string;
+  flag: Result['flag'];
+  followUpAction?: string;
+  approverId: string;
+}
+
+/**
+ * Records a medical result, signs it off and releases it to the patient:
+ * booking -> VERIFIED, result inserted as APPROVED, booking -> DELIVERED.
+ * The patient can only see a result once both are true (results RLS policy).
+ * An URGENT result without a follow-up action is rejected by the
+ * urgent_requires_follow_up constraint.
+ */
+export async function adminReleaseResult(input: ReleaseResultInput): Promise<string> {
+  const { booking } = input;
+  if (LIFECYCLE.indexOf(booking.status) < LIFECYCLE.indexOf('SAMPLE_COLLECTED')) {
+    throw new Error('Results can only be entered once the sample has been collected.');
   }
 
-  const ref = doc(db, 'bookings', bookingId);
-  await updateDoc(ref, { status: newState });
-  
-  await createAuditLog({
-    userId: admin.uid,
-    userEmail: admin.email,
-    action: 'TRANSITION_BOOKING_STATE',
-    entityId: bookingId,
-    entityType: 'booking',
-    previousValue: currentStatus,
-    newValue: newState
-  });
+  await walkBookingTo(booking.id, booking.status, 'VERIFIED');
+
+  const row = unwrapOne(
+    await getSupabase()
+      .from('results')
+      .insert({
+        booking_id: booking.id,
+        user_id: booking.userId,
+        raw_results: input.rawResults,
+        doctor_notes: input.doctorNotes,
+        flag: input.flag,
+        follow_up_action: input.followUpAction?.trim() || null,
+        status: 'reviewed',
+        medical_approval_status: 'APPROVED',
+        approved_by: input.approverId,
+        approved_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+  );
+
+  await adminTransitionBookingState(booking.id, 'DELIVERED');
+  return row.id;
 }
 
-/**
- * PAYMENTS (SUPER_ADMIN + OPS)
- */
-export async function adminVerifyPayment(
-  bookingId: string, 
-  transactionCode: string, 
-  status: 'paid' | 'unpaid',
-  admin: { uid: string; email: string; role: UserRole },
-  currentBookingStatus: BookingStatus
-) {
-  if (!db) return;
-  const ref = doc(db, 'bookings', bookingId);
-  const nextStatus: BookingStatus = status === 'paid' ? 'PAYMENT_CONFIRMED' : 'PAYMENT_PENDING';
+/* ------------------------------------------------------------------------ */
+/* USER MANAGEMENT (SUPER_ADMIN only)                                        */
+/* ------------------------------------------------------------------------ */
 
-  await updateDoc(ref, { 
-    paymentStatus: status,
-    transactionCode: transactionCode,
-    status: nextStatus
-  });
-
-  await createAuditLog({
-    userId: admin.uid,
-    userEmail: admin.email,
-    action: 'VERIFIED_PAYMENT',
-    entityId: bookingId,
-    entityType: 'payment',
-    newValue: { status, transactionCode, nextStatus }
-  });
+export async function adminGetAllUsers(): Promise<UserProfile[]> {
+  const rows = unwrapOne(
+    await getSupabase().from('profiles').select('*').order('created_at', { ascending: false })
+  );
+  return rows.map(toUserProfile);
 }
 
-/**
- * RESULTS (MEDICAL_ADMIN + SUPER_ADMIN)
- */
-export async function adminGetAllResults() {
-  if (!db) return [];
-  const q = query(collection(db, 'results'), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Result));
+/** Role changes are guarded (SUPER_ADMIN only) and audited by database triggers. */
+export async function adminUpdateUserRole(targetUserId: string, newRole: UserRole) {
+  unwrapOne(
+    await getSupabase()
+      .from('profiles')
+      .update({ role: newRole })
+      .eq('id', targetUserId)
+      .select('id')
+      .single()
+  );
 }
 
-export async function adminCreateResult(
-  result: Omit<Result, 'id' | 'createdAt'>,
-  adminId: string,
-  adminEmail: string
-) {
-  if (!db) return;
-  const res = await addDoc(collection(db, 'results'), {
-    ...result,
-    createdAt: serverTimestamp(),
-  });
+/* ------------------------------------------------------------------------ */
+/* AUDIT LOG (SUPER_ADMIN only, read-only)                                   */
+/* ------------------------------------------------------------------------ */
 
-  await createAuditLog({
-    userId: adminId,
-    userEmail: adminEmail,
-    action: 'CREATED_MEDICAL_RESULT',
-    entityId: res.id,
-    entityType: 'result',
-    newValue: result
-  });
-
-  return res.id;
+export async function adminGetAuditLogs(): Promise<AuditLog[]> {
+  const rows = unwrapOne(
+    await getSupabase()
+      .from('audit_logs')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(100)
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    userId: r.actor_id,
+    userEmail: r.actor_email,
+    userRole: r.actor_role,
+    action: r.action,
+    entityId: r.entity_id,
+    entityType: r.entity_type,
+    previousValue: r.previous_value,
+    newValue: r.new_value,
+    timestamp: new Date(r.created_at),
+  }));
 }
 
-/**
- * USER MANAGEMENT (SUPER_ADMIN ONLY)
- */
-export async function adminGetAllUsers() {
-  if (!db) return [];
-  const q = query(collection(db, 'users'), orderBy('createdAt', 'desc'));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ uid: d.id, ...d.data() } as UserProfile));
-}
+/* ------------------------------------------------------------------------ */
+/* LABS                                                                      */
+/* ------------------------------------------------------------------------ */
 
-export async function adminUpdateUserRole(
-  targetUserId: string, 
-  newRole: UserRole, 
-  adminId: string, 
-  adminEmail: string,
-  prevRole: string
-) {
-  if (!db) return;
-  const ref = doc(db, 'users', targetUserId);
-  await updateDoc(ref, { role: newRole });
-
-  await createAuditLog({
-    userId: adminId,
-    userEmail: adminEmail,
-    action: 'UPDATED_USER_ROLE',
-    entityId: targetUserId,
-    entityType: 'user',
-    previousValue: prevRole,
-    newValue: newRole
-  });
-}
-
-/**
- * AUDIT LOGS
- */
-export async function adminGetAuditLogs() {
-  if (!db) return [];
-  const q = query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(50));
-  const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as AuditLog));
-}
-
-/**
- * LABS
- */
-export async function adminGetLabs() {
-  if (!db) return [];
-  const snap = await getDocs(collection(db, 'labs'));
-  return snap.docs.map(d => ({ id: d.id, ...d.data() } as Lab));
+export async function adminGetLabs(): Promise<Lab[]> {
+  const rows = unwrapOne(await getSupabase().from('labs').select('*').order('name'));
+  return rows.map(toLab);
 }

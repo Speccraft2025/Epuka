@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { createBooking, getLabs } from '@/lib/firestore';
+import { createBooking, getLabs, getTests, submitPaymentCode, NewBooking } from '@/lib/data';
 import { STATIC_TESTS, Test, Lab } from '@/lib/types';
 import Navbar from '@/components/Navbar';
 import { useRouter } from 'next/navigation';
@@ -16,10 +16,12 @@ const Map = dynamic(() => import('@/components/Map'), {
 });
 
 export default function TestsPage() {
-  const { user, signInWithGoogle } = useAuth();
+  const { user, signIn } = useAuth();
   const router = useRouter();
   
+  const [tests, setTests] = useState<Test[]>(STATIC_TESTS);
   const [labs, setLabs] = useState<Lab[]>([]);
+  const [error, setError] = useState('');
   const [selected, setSelected] = useState<Test | null>(null);
   const [date, setDate] = useState('');
   const [collectionMethod, setCollectionMethod] = useState<'lab' | 'home' | null>(null);
@@ -31,14 +33,18 @@ export default function TestsPage() {
   const [bookingId, setBookingId] = useState('');
 
   useEffect(() => {
+    getTests().then(setTests);
+  }, []);
+
+  useEffect(() => {
     if (step === 'collection') {
-      getLabs().then(setLabs);
+      getLabs().then(setLabs).catch((e) => setError(e.message));
     }
   }, [step]);
 
   const handleSelect = (test: Test) => {
     if (!user) {
-      signInWithGoogle();
+      signIn();
       return;
     }
     setSelected(test);
@@ -52,14 +58,13 @@ export default function TestsPage() {
 
     setLoading(true);
     try {
-      const bookingData: any = {
+      setError('');
+      const bookingData: NewBooking = {
         userId: user.uid,
         testId: selected.id,
         testName: selected.name,
         date: new Date(date),
         collectionMethod,
-        status: 'pending',
-        paymentStatus: 'unpaid',
         price: selected.price,
       };
 
@@ -81,7 +86,7 @@ export default function TestsPage() {
       setStep('pay');
     } catch (e) {
       console.error(e);
-      alert('Failed to create booking. Please try again.');
+      alert(`Failed to create booking: ${e instanceof Error ? e.message : 'please try again.'}`);
     } finally {
       setLoading(false);
     }
@@ -108,7 +113,7 @@ export default function TestsPage() {
           </div>
 
           <div className={styles.grid}>
-            {STATIC_TESTS.map((test) => (
+            {tests.map((test) => (
               <div key={test.id} className={`${styles.testCard} ${test.popular ? styles.popular : ''}`}>
                 <div className={styles.testIcon}>{test.icon}</div>
                 <h3>{test.name}</h3>
@@ -197,12 +202,20 @@ export default function TestsPage() {
                 <h3>Complete Checkout</h3>
                 <p>Pay <strong>KES {selected.price.toLocaleString()}</strong> via M-Pesa.</p>
                 <input className="form-input" placeholder="M-Pesa Code" value={txCode} onChange={(e) => setTxCode(e.target.value.toUpperCase())} />
+                {error && <p role="alert" style={{ color: 'var(--clr-danger)', marginTop: 12 }}>{error}</p>}
                 <div className={styles.modalActions}>
-                  <button className="btn btn-primary" onClick={async () => {
-                    const { updateBookingPayment } = await import('@/lib/firestore');
-                    await updateBookingPayment(bookingId, txCode);
-                    setStep('done');
-                  }}>Finish Booking →</button>
+                  <button className="btn btn-primary" disabled={!txCode.trim() || loading} onClick={async () => {
+                    setLoading(true);
+                    setError('');
+                    try {
+                      await submitPaymentCode(bookingId, txCode);
+                      setStep('done');
+                    } catch (e) {
+                      setError(e instanceof Error ? e.message : 'Could not submit the payment code.');
+                    } finally {
+                      setLoading(false);
+                    }
+                  }}>{loading ? 'Submitting…' : 'Finish Booking →'}</button>
                 </div>
               </div>
             )}
@@ -210,7 +223,8 @@ export default function TestsPage() {
             {step === 'done' && (
               <div className={styles.modalContent} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '3rem' }}>✅</div>
-                <h3>Confirmed!</h3>
+                <h3>Booking received!</h3>
+                <p>We&apos;ll confirm your M-Pesa payment shortly — track progress on your dashboard.</p>
                 <button className="btn btn-primary" onClick={() => router.push('/dashboard')}>Go to Dashboard</button>
               </div>
             )}

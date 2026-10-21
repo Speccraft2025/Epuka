@@ -30,12 +30,7 @@ export default function BookingsAdmin() {
   const handleStatusChange = async (booking: Booking, newStatus: Booking['status']) => {
     if (!user) return;
     try {
-      await adminTransitionBookingState(
-        booking.id, 
-        newStatus, 
-        { uid: user.uid, email: user.email || '', role: role as any }, 
-        booking.status
-      );
+      await adminTransitionBookingState(booking.id, newStatus);
       fetchBookings();
     } catch (e) {
       alert(e instanceof Error ? e.message : 'Transition failed');
@@ -82,7 +77,7 @@ export default function BookingsAdmin() {
           <tbody>
             {filteredBookings.map((b) => (
               <tr key={b.id}>
-                <td>{new Date((b.createdAt as any).seconds * 1000).toLocaleDateString()}</td>
+                <td>{new Date(b.createdAt).toLocaleDateString()}</td>
                 <td>
                   <div style={{ fontWeight: 600 }}>{b.testName}</div>
                   <div className={styles.mono} style={{ fontSize: '0.7rem' }}>{b.id.slice(0, 8)}</div>

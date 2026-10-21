@@ -20,20 +20,19 @@ export default function PaymentsAdmin() {
   const fetchBookings = async () => {
     setLoading(true);
     const data = await adminGetAllBookings();
-    // Only show bookings that have a transaction code or are unpaid
-    setBookings(data.filter(b => b.paymentStatus === 'unpaid' || b.transactionCode));
+    // Unpaid bookings still at the payment stage of the lifecycle.
+    setBookings(data.filter(b => b.paymentStatus === 'unpaid' && ['BOOKED', 'PAYMENT_PENDING'].includes(b.status)));
     setLoading(false);
   };
 
   const handleVerify = async (booking: Booking) => {
     if (!user || !txCode) return;
-    await adminVerifyPayment(
-      booking.id, 
-      txCode, 
-      'paid', 
-      { uid: user.uid, email: user.email || '', role: role as any }, 
-      booking.status
-    );
+    try {
+      await adminVerifyPayment(booking.id, txCode, 'paid', booking.status);
+    } catch (e) {
+      alert(`Payment verification failed: ${e instanceof Error ? e.message : e}`);
+      return;
+    }
     setVerifyingId(null);
     setTxCode('');
     fetchBookings();

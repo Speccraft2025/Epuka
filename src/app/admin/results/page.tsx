@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { adminGetAllBookings, adminCreateResult, adminTransitionBookingState } from '@/lib/admin';
+import { adminGetAllBookings, adminReleaseResult } from '@/lib/admin';
 import { Booking } from '@/lib/types';
 import { generateInterpretation, suggestFlag } from '@/lib/medical';
 import styles from '../page.module.css';
 
 export default function MedicalResultsAdmin() {
-  const { user, role } = useAuth();
+  const { user } = useAuth();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -29,7 +29,8 @@ export default function MedicalResultsAdmin() {
   const fetchBookings = async () => {
     setLoading(true);
     const data = await adminGetAllBookings();
-    setBookings(data.filter(b => ['SAMPLE_COLLECTED', 'IN_ANALYSIS', 'PAYMENT_CONFIRMED', 'ASSIGNED_TO_LAB'].includes(b.status)));
+    // Results can only be entered once a sample exists.
+    setBookings(data.filter(b => ['SAMPLE_COLLECTED', 'IN_ANALYSIS', 'VERIFIED'].includes(b.status)));
     setLoading(false);
   };
 
@@ -52,8 +53,8 @@ export default function MedicalResultsAdmin() {
     if (!user || !selectedBooking || !form.doctorNotes || !form.rawResults) return;
     
     // Safety Lock for Urgent Cases
-    if (form.flag === 'URGENT' && !form.urgentConfirmed) {
-      alert("This is an URGENT case. Please confirm manual review and follow-up before releasing.");
+    if (form.flag === 'URGENT' && (!form.urgentConfirmed || !form.followUpAction.trim())) {
+      alert("This is an URGENT case. Document the follow-up action and confirm manual review before releasing.");
       return;
     }
 
@@ -67,29 +68,25 @@ export default function MedicalResultsAdmin() {
         interpreted = { "Overall Summary": { value: form.rawResults, unit: '', range: '', status: 'normal' } };
       }
 
-      await adminCreateResult({
-        userId: selectedBooking.userId,
-        bookingId: selectedBooking.id,
+      // Signs off the result and walks the booking to DELIVERED so the
+      // patient can see it. Every step is audited by the database.
+      await adminReleaseResult({
+        booking: selectedBooking,
         rawResults: interpreted,
         doctorNotes: form.doctorNotes,
         flag: form.flag,
         followUpAction: form.followUpAction,
-        status: 'reviewed',
-        medicalApprovalStatus: form.flag === 'URGENT' ? 'PENDING' : 'APPROVED',
-      }, user.uid, user.email || '');
-
-      await adminTransitionBookingState(
-        selectedBooking.id, 
-        'CLOSED', 
-        { uid: user.uid, email: user.email || '', role: role as any }, 
-        selectedBooking.status
-      );
+        approverId: user.uid,
+      });
       
       setSelectedBooking(null);
       setForm({ doctorNotes: '', rawResults: '', flag: 'NORMAL', followUpAction: '', urgentConfirmed: false });
       fetchBookings();
     } catch (e) {
       console.error(e);
+      alert(`Could not release results: ${e instanceof Error ? e.message : e}`);
+      // Refresh: the booking may have advanced part-way.
+      fetchBookings();
     } finally {
       setSubmitting(false);
     }

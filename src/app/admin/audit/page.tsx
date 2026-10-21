@@ -39,11 +39,11 @@ export default function AuditLogsAdmin() {
             {logs.map((log) => (
               <tr key={log.id}>
                 <td className={styles.mono} style={{ fontSize: '0.75rem' }}>
-                  {log.timestamp ? new Date((log.timestamp as any).seconds * 1000).toLocaleString() : '—'}
+                  {log.timestamp ? new Date(log.timestamp).toLocaleString() : '—'}
                 </td>
                 <td>
-                  <div style={{ fontWeight: 600 }}>{log.userEmail}</div>
-                  <div className={styles.mono} style={{ fontSize: '0.7rem' }}>{log.userId.slice(0, 8)}</div>
+                  <div style={{ fontWeight: 600 }}>{log.userEmail ?? 'system'}</div>
+                  <div className={styles.mono} style={{ fontSize: '0.7rem' }}>{log.userRole ?? ''} {log.userId?.slice(0, 8) ?? ''}</div>
                 </td>
                 <td>
                   <span className={styles.badge} style={{ background: 'var(--clr-surface-2)', color: 'var(--clr-green)' }}>

@@ -27,4 +27,4 @@ The operational workflow + lab network; trust in secure, accountable results han
 Regulatory/medical compliance and logistics reliability. Mitigate with strict role controls and audit trails.
 
 ## Status
-Development. Stack: Next.js 14, Firestore, Firebase Auth, Leaflet, Netlify, M-Pesa.
+Development. Stack: Next.js 14, Supabase (Postgres, Auth, RLS), Leaflet, Netlify, M-Pesa (manual verification).

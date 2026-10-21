@@ -1,14 +1,14 @@
 'use client';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { updateUserProfile } from '@/lib/firestore';
+import { updateUserProfile } from '@/lib/data';
 import { useRouter } from 'next/navigation';
 import styles from './page.module.css';
 
 const steps = ['Basic Info', 'Body Metrics', 'Lifestyle'];
 
 export default function OnboardingPage() {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -44,6 +44,7 @@ export default function OnboardingPage() {
           exercise: form.exercise,
         },
       });
+      await refreshProfile();
       router.push('/dashboard');
     } catch (err) {
       console.error(err);
